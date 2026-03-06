@@ -450,34 +450,43 @@ function sumMonths(contact, from, to) {
   return { sent: s, received: r, responded: d, score: s + r + d };
 }
 
+function clusterAnchor(cluster, w, h) {
+  if (!tog.clusters) return { x: w / 2, y: h / 2 };
+  const R = Math.min(w, h) * 0.30;
+  if (cluster === 'internal') return { x: w / 2 - R * 0.90, y: h / 2 - R * 0.50 };
+  if (cluster === 'external') return { x: w / 2 + R * 0.90, y: h / 2 - R * 0.50 };
+  return { x: w / 2, y: h / 2 + R * 0.75 };
+}
+
+function buildTagAnchors(contacts, w, h) {
+  const ct = { internal: {}, external: {}, unset: {} };
+  contacts.forEach(c => { const t = c.tag || '__none__'; if (!ct[c.cluster][t]) ct[c.cluster][t] = []; ct[c.cluster][t].push(c.email); });
+  const ta = {};
+  ['internal', 'external', 'unset'].forEach(cl => {
+    const base = clusterAnchor(cl, w, h), tags = Object.keys(ct[cl]), sR = Math.min(w, h) * 0.10;
+    tags.forEach((tag, i) => {
+      const ang = tags.length > 1 ? 2 * Math.PI * i / tags.length - Math.PI / 2 : 0;
+      const r = tags.length > 1 ? sR : 0;
+      const a = { x: base.x + r * Math.cos(ang), y: base.y + r * Math.sin(ang) };
+      ct[cl][tag].forEach(em => { ta[em] = a; });
+    });
+  });
+  return ta;
+}
+
 function nodeRadius(score, maxScore) { return 12 + (score / maxScore) * 32; }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FORCE LAYOUT  — single shared center, cluster + tag forces
-//
-// Model:
-//   • Every node is attracted toward canvas center (weak baseline gravity)
-//   • CLUSTER force: internal nodes pulled left, external pulled right.
-//     "Unset" nodes feel no lateral cluster pull — stay near center.
-//   • TAG cohesion: nodes sharing a non-empty tag attract each other.
-//   • Repulsion hierarchy (all node-pair repulsion):
-//       - opposite cluster (int vs ext)  → 3× base repel
-//       - different tag (same cluster)   → 1× base repel
-//       - same tag                       → 0.3× base repel (nodes can huddle)
-//     "Unset" nodes count as their own neutral group for repulsion.
+// FORCE LAYOUT
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ForceLayout {
   constructor(nodes, w, h) {
-    this.w = w; this.h = h; this.iter = 0; this.MAX = 800;
+    this.w = w; this.h = h; this.iter = 0; this.MAX = 600;
     this.pos = {}; this.vel = {};
-    // Seed positions: internal left-half, external right-half, unset center
     nodes.forEach(n => {
-      const cx = w / 2, cy = h / 2, jitter = 60;
-      let sx = cx, sy = cy;
-      if (n.cluster === 'internal') sx = cx * 0.5;
-      else if (n.cluster === 'external') sx = cx * 1.5;
-      this.pos[n.id] = { x: sx + (Math.random() - .5) * jitter, y: sy + (Math.random() - .5) * jitter };
+      const a = n.tagAnchor || clusterAnchor(n.cluster, w, h);
+      this.pos[n.id] = { x: a.x + (Math.random() - .5) * 50, y: a.y + (Math.random() - .5) * 50 };
       this.vel[n.id] = { x: 0, y: 0 };
     });
     this.nodes = nodes;
@@ -486,81 +495,35 @@ class ForceLayout {
   tick() {
     if (this.iter++ > this.MAX) return;
     const { w, h, pos, vel, nodes } = this;
-    const cx = w / 2, cy = h / 2;
     const maxScore = Math.max(...nodes.map(n => n.score), 1);
-    const MARGIN = 48;
-    // Cluster pull: how far left/right of center internal/external anchors are
-    const CLUSTER_OFFSET = Math.min(w, h) * 0.22;
+    const MAX_REP  = Math.min(w, h) * 0.55;
+    const MARGIN   = 48;
 
     nodes.forEach(n => {
-      const weight = n.score / maxScore; // 0..1
+      const anch   = n.tagAnchor || clusterAnchor(n.cluster, w, h);
+      const weight = n.score / maxScore;
+      const ideal  = Math.max(n.r + 6, Math.min(w, h) * (0.04 + 0.20 * (1 - weight)));
+      const dx = pos[n.id].x - anch.x, dy = pos[n.id].y - anch.y;
+      const d  = Math.sqrt(dx * dx + dy * dy) || 1;
+      const gF = (d - ideal) * physGravity * 0.005;
+      vel[n.id].x -= dx / d * gF; vel[n.id].y -= dy / d * gF;
 
-      // ── 1. Center gravity (all nodes pulled weakly toward canvas center) ──
-      const dcx = pos[n.id].x - cx, dcy = pos[n.id].y - cy;
-      const distC = Math.sqrt(dcx * dcx + dcy * dcy) || 1;
-      // Gravity strengthens with distance so nodes don't fly to margin
-      const centerF = physGravity * 0.003 * distC / (Math.min(w,h) * 0.5);
-      vel[n.id].x -= dcx * centerF;
-      vel[n.id].y -= dcy * centerF;
-
-      // ── 2. Cluster lateral force (int→left, ext→right, unset→none) ────────
-      if (tog.clusters && n.cluster !== 'unset') {
-        const clusterTargetX = n.cluster === 'internal'
-          ? cx - CLUSTER_OFFSET
-          : cx + CLUSTER_OFFSET;
-        const clusterDx = pos[n.id].x - clusterTargetX;
-        // Spring toward cluster side; heavier nodes pulled more strongly
-        const clF = physGravity * 0.006 * (1 + weight * 0.5);
-        vel[n.id].x -= clusterDx * clF;
-      }
-
-      // ── 3. Tag cohesion — attract toward centroid of same-tag peers ───────
-      if (n.tag) {
-        let sumX = 0, sumY = 0, count = 0;
-        nodes.forEach(o => {
-          if (o.id !== n.id && o.tag === n.tag) {
-            sumX += pos[o.id].x; sumY += pos[o.id].y; count++;
-          }
-        });
-        if (count > 0) {
-          const centX = sumX / count, centY = sumY / count;
-          const tdx = pos[n.id].x - centX, tdy = pos[n.id].y - centY;
-          const td = Math.sqrt(tdx * tdx + tdy * tdy) || 1;
-          // Cohesion: pull toward centroid, stronger the further away
-          const tagF = physGravity * 0.004 * td / (Math.min(w,h) * 0.3);
-          vel[n.id].x -= tdx * tagF;
-          vel[n.id].y -= tdy * tagF;
-        }
-      }
-
-      // ── 4. Pairwise repulsion with hierarchy ──────────────────────────────
       nodes.forEach(o => {
         if (o.id === n.id) return;
         const ox = pos[n.id].x - pos[o.id].x, oy = pos[n.id].y - pos[o.id].y;
         const od = Math.sqrt(ox * ox + oy * oy) || 1;
-        const minSep = n.r + o.r + 14;
-        if (od > Math.min(w, h) * 0.6) return; // ignore very distant pairs
-
-        // Repulsion multiplier by relationship
-        let mult = 1.0;
-        const oppCluster = (n.cluster === 'internal' && o.cluster === 'external')
-                        || (n.cluster === 'external' && o.cluster === 'internal');
-        const sameTag = n.tag && o.tag && n.tag === o.tag;
-
-        if (oppCluster)  mult = 3.0;   // opposite clusters push hard
-        else if (sameTag) mult = 0.3;  // same tag — allow clustering
-        // else: different tag same cluster → 1.0 (base)
-
-        const rF = physRepel * 0.010 * mult * minSep * minSep / (od * od + 1);
-        const cap = oppCluster ? 6.0 : 3.0;
-        vel[n.id].x += Math.max(-cap, Math.min(cap, ox / od * rF));
-        vel[n.id].y += Math.max(-cap, Math.min(cap, oy / od * rF));
+        if (od < MAX_REP) {
+          const minSep = n.r + o.r + 10;
+          const rF = physRepel * 0.012 * minSep * minSep / (od * od + 1);
+          const cap = 3.5;
+          vel[n.id].x += Math.max(-cap, Math.min(cap, ox / od * rF));
+          vel[n.id].y += Math.max(-cap, Math.min(cap, oy / od * rF));
+        }
       });
 
-      // ── 5. Damping + velocity cap ─────────────────────────────────────────
-      vel[n.id].x *= 0.78; vel[n.id].y *= 0.78;
+      vel[n.id].x *= 0.80; vel[n.id].y *= 0.80;
       const sp = Math.sqrt(vel[n.id].x ** 2 + vel[n.id].y ** 2);
-      if (sp > 10) { vel[n.id].x = vel[n.id].x / sp * 10; vel[n.id].y = vel[n.id].y / sp * 10; }
+      if (sp > 8) { vel[n.id].x = vel[n.id].x / sp * 8; vel[n.id].y = vel[n.id].y / sp * 8; }
       pos[n.id].x = Math.max(MARGIN, Math.min(w - MARGIN, pos[n.id].x + vel[n.id].x));
       pos[n.id].y = Math.max(MARGIN, Math.min(h - MARGIN, pos[n.id].y + vel[n.id].y));
     });
@@ -628,9 +591,7 @@ function buildSVG(contacts) {
   // Attach cluster/tag from store
   const metaMap = CS.load();
   contacts.forEach(c => { const m = metaMap[c.email] || {}; c.cluster = m.category || 'unset'; c.tag = m.tag || ''; });
-
-  // Which clusters are populated?
-  const activeClusters = new Set(contacts.map(c => c.cluster));
+  const tagAnchors = buildTagAnchors(contacts, w, h);
 
   // ── Defs ──────────────────────────────────────────────────────────────────
   let defs = svgEl_.querySelector('defs');
@@ -666,34 +627,31 @@ function buildSVG(contacts) {
     grid.append(se('circle', { cx: x, cy: y, r: '1', fill: '#3a4a6a' }));
   zwEl_.append(grid);
 
-  // ── Zone halos (only populated clusters, int=left ext=right unset=center) ──
+  // ── Zone halos ─────────────────────────────────────────────────────────────
   if (tog.clusters) {
-    const zoneSpecs = [
-      { cl: 'internal', col: '#10d98a', lbl: 'INTERNAL', ax: w * 0.28, ay: h * 0.50 },
-      { cl: 'external', col: '#f59e0b', lbl: 'EXTERNAL', ax: w * 0.72, ay: h * 0.50 },
-      { cl: 'unset',    col: '#4e607a', lbl: 'UNSET',    ax: w * 0.50, ay: h * 0.50 },
-    ];
-    zoneSpecs.forEach(({ cl, col: color, lbl, ax, ay }) => {
-      if (!activeClusters.has(cl)) return; // hide empty clusters
+    [{ cl: 'internal', col: '#10d98a', lbl: 'INTERNAL' },
+     { cl: 'external', col: '#f59e0b', lbl: 'EXTERNAL' },
+     { cl: 'unset',    col: '#4e607a', lbl: 'UNSET'    }].forEach(({ cl, col: color, lbl }) => {
+      const a = clusterAnchor(cl, w, h);
       const density = Math.max(1, contacts.filter(c => c.cluster === cl).length);
-      const zR = Math.min(w, h) * (0.12 + 0.035 * Math.sqrt(density));
-      const fill = se('circle', { cx: ax, cy: ay, r: zR, fill: color, opacity: '.04', class: 'zone-el' });
-      const ring = se('circle', { cx: ax, cy: ay, r: zR, fill: 'none', stroke: color,
-        'stroke-width': '1', 'stroke-dasharray': '5 8', opacity: '.20', class: 'zone-el' });
-      const txt  = se('text',   { x: ax, y: ay - zR - 8, 'text-anchor': 'middle', class: 'zone-el',
-        style: `font-size:9px;fill:${color};letter-spacing:3px;font-family:var(--mono);opacity:.4` });
+      const zR = Math.min(w, h) * (0.14 + 0.04 * Math.sqrt(density));
+      const fill = se('circle', { cx: a.x, cy: a.y, r: zR, fill: color, opacity: '.04', class: 'zone-el' });
+      const ring = se('circle', { cx: a.x, cy: a.y, r: zR, fill: 'none', stroke: color, 'stroke-width': '1', 'stroke-dasharray': '5 8', opacity: '.22', class: 'zone-el' });
+      const txt  = se('text',   { x: a.x, y: a.y - zR - 7, 'text-anchor': 'middle', class: 'zone-el',
+        style: `font-size:9px;fill:${color};letter-spacing:3px;font-family:var(--mono);opacity:.45` });
       txt.textContent = lbl;
       if (!tog.zones) [fill, ring, txt].forEach(e => { e.style.display = 'none'; });
       zwEl_.append(fill, ring, txt);
     });
   }
 
-  // ── Lines (all from canvas center outward) ────────────────────────────────
+  // ── Lines ──────────────────────────────────────────────────────────────────
   const lineGrp = se('g'); const lineEls = {};
   contacts.forEach(c => {
     const col = computeRGB(c.totals.sent, c.totals.received, c.totals.responded, maxVal);
-    const ln = se('line', { x1: w/2, y1: h/2, x2: w/2, y2: h/2,
-      stroke: rgba(col, .22), 'stroke-width': (c.totals.score / maxScore) * 1.8 + 0.4,
+    const a = clusterAnchor(c.cluster, w, h);
+    const ln = se('line', { x1: a.x, y1: a.y, x2: a.x, y2: a.y,
+      stroke: rgba(col, .25), 'stroke-width': (c.totals.score / maxScore) * 1.8 + 0.4,
       'stroke-dasharray': '3 7', class: 'line-el' });
     if (!tog.lines) ln.style.display = 'none';
     lineEls[c.email] = ln; lineGrp.append(ln);
@@ -743,22 +701,11 @@ function buildSVG(contacts) {
     nodeGroups[c.email] = g; nodeGrp.append(g);
   });
 
-  // Center dot (common gravity origin)
-  nodeGrp.append(
-    se('circle', { cx: w/2, cy: h/2, r: 10, fill: 'none', stroke: '#3a4a6a', 'stroke-width': '1', 'stroke-dasharray': '3 5', opacity: '.4' }),
-    se('circle', { cx: w/2, cy: h/2, r:  3, fill: '#3a4a6a', opacity: '.6' })
-  );
-
-  // Cluster anchor dots (only populated, int=left ext=right)
+  // Cluster anchor dots
   if (tog.clusters) {
-    [{ cl: 'internal', color: '#10d98a', ax: w * 0.28, ay: h * 0.50 },
-     { cl: 'external', color: '#f59e0b', ax: w * 0.72, ay: h * 0.50 },
-     { cl: 'unset',    color: '#4e607a', ax: w * 0.50, ay: h * 0.50 }].forEach(({ cl, color, ax, ay }) => {
-      if (!activeClusters.has(cl) || cl === 'unset') return;
-      nodeGrp.append(
-        se('circle', { cx: ax, cy: ay, r: 9, fill: color, opacity: '.15', filter: 'url(#glow)' }),
-        se('circle', { cx: ax, cy: ay, r: 4, fill: color, opacity: '.65' })
-      );
+    [{ cl: 'internal', c: '#10d98a' }, { cl: 'external', c: '#f59e0b' }, { cl: 'unset', c: '#4e607a' }].forEach(({ cl, c: color }) => {
+      const a = clusterAnchor(cl, w, h);
+      nodeGrp.append(se('circle', { cx: a.x, cy: a.y, r: 9, fill: color, opacity: '.18', filter: 'url(#glow)' }), se('circle', { cx: a.x, cy: a.y, r: 4, fill: color, opacity: '.7' }));
     });
   }
   zwEl_.append(nodeGrp);
@@ -766,7 +713,7 @@ function buildSVG(contacts) {
   // ── Physics loop ──────────────────────────────────────────────────────────
   const nodes = contacts.map(c => ({
     id: c.email, score: c.totals.score, cluster: c.cluster, tag: c.tag,
-    r: nodeRadius(c.totals.score, maxScore),
+    r: nodeRadius(c.totals.score, maxScore), tagAnchor: tagAnchors[c.email],
   }));
   const layout = new ForceLayout(nodes, w, h);
 
