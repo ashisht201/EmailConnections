@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Email Gravity Map</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@300;500;700&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#05070d; --surface:#0b0f1c; --surface2:#0f1628;
+  --border:#1c2440; --muted:#2d3a5c; --dim:#4e607a;
+  --text:#cdd8f0; --bright:#eef2ff;
+  --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif;
+  /* default channel colors — vivid */
+  --c-sent:#00cfff; --c-recv:#ff3d6e; --c-resp:#ffe033;
+}
+
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:var(--mono);overflow:hidden}
+#app{display:flex;flex-direction:column;height:100vh}
+
+/* ── Header ── */
+header{
+  flex-shrink:0;padding:11px 22px 9px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  background:var(--surface);
+}
+.header-titles .eyebrow{font-size:9px;letter-spacing:4px;color:var(--muted);text-transform:uppercase}
+.header-titles .title{font-family:var(--sans);font-size:16px;font-weight:700;color:var(--bright);margin-top:1px;letter-spacing:-.3px}
+
+.hdr-controls{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap}
+.hdr-controls label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--dim)}
+.hdr-controls input[type="month"]{
+  background:var(--surface2);border:1px solid var(--muted);border-radius:4px;
+  color:var(--text);font-family:var(--mono);font-size:11px;
+  padding:4px 8px;outline:none;cursor:pointer;transition:border-color .15s;color-scheme:dark;
+}
+.hdr-controls input[type="month"]:focus,
+.hdr-controls input[type="month"]:hover{border-color:var(--c-sent)}
+.hdr-controls input[type="number"]{
+  background:var(--surface2);border:1px solid var(--muted);border-radius:4px;
+  color:var(--text);font-family:var(--mono);font-size:11px;
+  padding:4px 6px;outline:none;width:50px;text-align:center;
+  -moz-appearance:textfield;transition:border-color .15s;
+}
+.hdr-controls input[type="number"]::-webkit-inner-spin-button{opacity:.4}
+.hdr-controls input[type="number"]:focus{border-color:var(--c-sent)}
+.sep{color:var(--muted);font-size:11px}
+.vdiv{width:1px;height:18px;background:var(--border);margin:0 2px}
+
+#apply-btn{
+  background:var(--c-sent);border:none;border-radius:4px;
+  color:#000;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:1px;
+  text-transform:uppercase;padding:5px 12px;cursor:pointer;transition:opacity .15s;
+}
+#apply-btn:hover{opacity:.85}
+
+.contacts-link{
+  font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);
+  background:var(--surface2);border:1px solid var(--border);border-radius:4px;
+  padding:5px 10px;cursor:pointer;text-decoration:none;transition:all .15s;white-space:nowrap;
+}
+.contacts-link:hover{border-color:var(--muted);color:var(--text)}
+
+/* ── Legend bar ── */
+#legend{
+  flex-shrink:0;padding:5px 22px;border-bottom:1px solid #0a0f1e;
+  display:flex;gap:4px;align-items:center;flex-wrap:wrap;
+  background:var(--surface);
+}
+.ch-item{
+  display:flex;align-items:center;gap:5px;
+  font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);
+  margin-right:8px;
+}
+.ch-swatch{
+  width:13px;height:13px;border-radius:3px;cursor:pointer;flex-shrink:0;
+  border:1px solid rgba(255,255,255,.15);transition:transform .12s,box-shadow .12s;position:relative;
+}
+.ch-swatch:hover{transform:scale(1.3)}
+.ch-swatch input[type="color"]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:none;padding:0}
+#reset-colors{
+  font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);
+  background:none;border:1px solid var(--muted);border-radius:3px;
+  padding:2px 7px;cursor:pointer;transition:all .15s;margin-right:6px;
+}
+#reset-colors:hover{color:var(--text);border-color:var(--dim)}
+.cluster-legend{display:flex;gap:14px;margin-left:auto;align-items:center}
+.cl-item{display:flex;align-items:center;gap:5px;font-size:9px;letter-spacing:1px;text-transform:uppercase}
+.cl-dot{width:9px;height:9px;border-radius:50%}
+
+/* ── Canvas ── */
+#canvas-wrap{flex:1;position:relative;overflow:hidden}
+svg{display:block}
+
+/* ── Detail panel ── */
+#detail{
+  position:absolute;top:12px;right:12px;width:230px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:15px;font-size:11px;line-height:1.5;
+  box-shadow:0 8px 48px rgba(0,0,0,.8);
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+#detail.visible{opacity:1;pointer-events:auto}
+.d-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.d-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.d-name{font-family:var(--sans);font-weight:700;color:var(--bright);font-size:13px}
+.d-email{color:var(--dim);font-size:10px}
+.d-meta{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.d-pill{font-size:9px;padding:2px 7px;border-radius:8px;letter-spacing:.5px}
+.d-cat-internal{background:#0a3d2a;color:#10d98a;border:1px solid #0d5c40}
+.d-cat-external{background:#3d2a08;color:#f59e0b;border:1px solid #6b4800}
+.d-cat-none{background:var(--muted);color:var(--dim)}
+.d-tag-pill{background:#1a1f3a;color:#7c8fc0;border:1px solid var(--border)}
+.stat-row{display:flex;justify-content:space-between;margin-bottom:3px}
+.bar-wrap{height:3px;background:#0a0f1e;border-radius:2px;margin-bottom:7px}
+.bar-fill{height:100%;border-radius:2px;opacity:.9}
+hr.div{border:none;border-top:1px solid var(--border);margin:9px 0}
+.score-row{display:flex;justify-content:space-between}
+.swatch-row{display:flex;align-items:center;gap:7px;margin-top:7px}
+.d-swatch{width:20px;height:20px;border-radius:3px;flex-shrink:0}
+
+/* ── Footer ── */
+footer{
+  flex-shrink:0;padding:6px 22px;border-top:1px solid #0a0f1e;
+  display:flex;gap:18px;font-size:9px;color:var(--muted);letter-spacing:1px;flex-wrap:wrap;
+  background:var(--surface);
+}
+
+/* ── Overlay ── */
+#overlay{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;
+  font-size:13px;color:var(--dim);background:var(--bg);
+}
+#overlay.hidden{display:none}
+.spinner{width:30px;height:30px;border:2px solid var(--muted);border-top-color:var(--c-sent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-hint{font-size:10px;color:var(--muted);max-width:340px;text-align:center;line-height:1.8}
+code{background:#1a2540;padding:2px 5px;border-radius:3px;color:#66aaff;font-family:var(--mono)}
+
+#no-data-notice{
+  position:absolute;inset:0;display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  color:var(--dim);font-size:12px;pointer-events:none;
+}
+#no-data-notice.visible{display:flex}
+</style>
+</head>
+<body>
+<script src="contacts-store.js"></script>
+<div id="app">
+
+<header>
+  <div class="header-titles">
+    <div class="eyebrow">Mailbox Intelligence</div>
+    <div class="title">Communication Gravity Map</div>
+  </div>
+  <div class="hdr-controls">
+    <label>From</label>
+    <input type="month" id="input-from"/>
+    <span class="sep">→</span>
+    <label>To</label>
+    <input type="month" id="input-to"/>
+    <div class="vdiv"></div>
+    <label>Show</label>
+    <input type="number" id="input-topn" value="20" min="1" max="200" title="Max contacts"/>
+    <label>Min</label>
+    <input type="number" id="input-min"  value="3"  min="1" max="999" title="Min score"/>
+    <div class="vdiv"></div>
+    <button id="apply-btn">Apply</button>
+    <a class="contacts-link" href="table.html" title="Manage categories and tags">⊞ Contacts</a>
+  </div>
+</header>
+
+<div id="legend">
+  <!-- channel color pickers -->
+  <div class="ch-item">
+    <div class="ch-swatch" id="sw-sent"><input type="color" id="pick-sent" value="#00cfff"/></div>
+    Sent
+  </div>
+  <div class="ch-item">
+    <div class="ch-swatch" id="sw-recv"><input type="color" id="pick-recv" value="#ff3d6e"/></div>
+    Received
+  </div>
+  <div class="ch-item">
+    <div class="ch-swatch" id="sw-resp"><input type="color" id="pick-resp" value="#ffe033"/></div>
+    Responded
+  </div>
+  <button id="reset-colors">Reset</button>
+
+  <!-- cluster legend -->
+  <div class="cluster-legend">
+    <div class="cl-item"><div class="cl-dot" style="background:#10d98a;box-shadow:0 0 6px #10d98a88"></div>Internal</div>
+    <div class="cl-item"><div class="cl-dot" style="background:#f59e0b;box-shadow:0 0 6px #f59e0b88"></div>External</div>
+    <div class="cl-item"><div class="cl-dot" style="background:#4e607a"></div>Unset</div>
+    <span style="color:var(--muted);font-size:9px;letter-spacing:1px;margin-left:6px">SIZE & PROXIMITY = INTENSITY</span>
+  </div>
+</div>
+
+<div id="canvas-wrap">
+  <div id="overlay"><div class="spinner"></div><span>Loading…</span></div>
+  <div id="no-data-notice">
+    <span style="font-size:22px">∅</span>
+    <span>No contacts meet the threshold for this period.</span>
+    <span style="font-size:10px;color:var(--muted)">Try widening the date range or lowering Min.</span>
+  </div>
+  <svg id="svg"></svg>
+  <div id="detail">
+    <div class="d-header">
+      <div class="d-dot" id="d-dot"></div>
+      <div><div class="d-name" id="d-name"></div><div class="d-email" id="d-email"></div></div>
+    </div>
+    <div class="d-meta" id="d-meta"></div>
+    <div id="d-stats"></div>
+    <hr class="div"/>
+    <div class="score-row">
+      <span style="color:var(--dim)">Intensity score</span>
+      <span id="d-score" style="font-weight:600"></span>
+    </div>
+    <div class="swatch-row">
+      <div class="d-swatch" id="d-swatch"></div>
+      <div style="color:var(--dim);font-size:10px" id="d-rgb"></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span id="ft-contacts">CONTACTS —</span>
+  <span id="ft-total">INTERACTIONS —</span>
+  <span id="ft-top">TOP —</span>
+  <span id="ft-window">WINDOW —</span>
+  <span id="ft-clusters" style="margin-left:auto">CLUSTERS —</span>
+</footer>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// Color system — vivid additive blend
+// ══════════════════════════════════════════════════════════════════════════════
+const DEFAULTS = { sent:'#00cfff', recv:'#ff3d6e', resp:'#ffe033' };
+const ch = { ...DEFAULTS };
+
+function hexToRGB(h){
+  const n=parseInt(h.slice(1),16);
+  return{r:(n>>16)&255,g:(n>>8)&255,b:n&255};
+}
+
+function computeRGB(sent,received,responded,maxVal){
+  const mx=maxVal||1;
+  const wS=Math.sqrt(sent/mx), wR=Math.sqrt(received/mx), wD=Math.sqrt(responded/mx);
+  const cS=hexToRGB(ch.sent), cR=hexToRGB(ch.recv), cD=hexToRGB(ch.resp);
+  const raw={
+    r: cS.r*wS + cR.r*wR + cD.r*wD,
+    g: cS.g*wS + cR.g*wR + cD.g*wD,
+    b: cS.b*wS + cR.b*wR + cD.b*wD,
+  };
+  // Normalize to keep vivid: scale so brightest channel hits 255
+  const peak=Math.max(raw.r,raw.g,raw.b,1);
+  const scale=255/peak;
+  return{
+    r:Math.min(255,Math.round(raw.r*scale)),
+    g:Math.min(255,Math.round(raw.g*scale)),
+    b:Math.min(255,Math.round(raw.b*scale)),
+  };
+}
+
+const rgba=({r,g,b},a=1)=>`rgba(${r},${g},${b},${a})`;
+
+function syncSwatches(){
+  ['sent','recv','resp'].forEach(k=>{
+    const id=k==='sent'?'sw-sent':k==='recv'?'sw-recv':'sw-resp';
+    document.getElementById(id).style.background=ch[k];
+    document.getElementById(id).style.color=ch[k];
+  });
+}
+syncSwatches();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Month helpers
+// ══════════════════════════════════════════════════════════════════════════════
+function sumMonths(contact,fromYM,toYM){
+  let sent=0,received=0,responded=0;
+  for(const[m,v]of Object.entries(contact.months||{})){
+    if(m>=fromYM&&m<=toYM){sent+=v.sent||0;received+=v.received||0;responded+=v.responded||0;}
+  }
+  return{sent,received,responded,score:sent+received+responded};
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Cluster physics — 3 zones, tag sub-groups within each
+// ══════════════════════════════════════════════════════════════════════════════
+// We place three "attractor" anchors around the canvas and run force layout
+// where each node is pulled toward its cluster anchor + its tag centroid.
+
+function clusterAnchor(cluster, w, h){
+  const cx=w/2, cy=h/2, R=Math.min(w,h)*0.28;
+  // internal: top-left, external: top-right, unset: bottom-center
+  if(cluster==='internal') return{x:cx-R*0.85, y:cy-R*0.55};
+  if(cluster==='external') return{x:cx+R*0.85, y:cy-R*0.55};
+  return{x:cx, y:cy+R*0.7};
+}
+
+class ForceLayout{
+  constructor(nodes,w,h){
+    this.w=w;this.h=h;this.iter=0;this.MAX=500;
+    this.pos={};this.vel={};
+    // Init near cluster anchor
+    nodes.forEach(n=>{
+      const a=clusterAnchor(n.cluster,w,h);
+      const jitter=40;
+      this.pos[n.id]={x:a.x+(Math.random()-.5)*jitter,y:a.y+(Math.random()-.5)*jitter};
+      this.vel[n.id]={x:0,y:0};
+    });
+    this.nodes=nodes;
+  }
+
+  tick(){
+    if(this.iter++>this.MAX)return false;
+    const{w,h,pos,vel,nodes}=this;
+    const MARGIN=55;
+    const maxScore=Math.max(...nodes.map(n=>n.score),1);
+
+    nodes.forEach(n=>{
+      // Pull toward tag anchor (centroid of same tag within same cluster)
+      const anchor=n.tagAnchor||clusterAnchor(n.cluster,w,h);
+      const dx=pos[n.id].x-anchor.x, dy=pos[n.id].y-anchor.y;
+      const d=Math.sqrt(dx*dx+dy*dy)||1;
+      // Target distance from anchor based on score (heavier = closer)
+      const ideal=20+(1-n.score/maxScore)*55;
+      const f=(d-ideal)*0.06;
+      vel[n.id].x-=dx/d*f;
+      vel[n.id].y-=dy/d*f;
+
+      // Repel from other nodes
+      nodes.forEach(o=>{
+        if(o.id===n.id)return;
+        const ox=pos[n.id].x-pos[o.id].x, oy=pos[n.id].y-pos[o.id].y;
+        const od=Math.sqrt(ox*ox+oy*oy)||1;
+        const minDist=n.r+o.r+8;
+        if(od<minDist){const rep=(minDist-od)*0.12/od;vel[n.id].x+=ox*rep;vel[n.id].y+=oy*rep;}
+      });
+
+      vel[n.id].x*=0.82;vel[n.id].y*=0.82;
+      pos[n.id].x=Math.max(MARGIN,Math.min(w-MARGIN,pos[n.id].x+vel[n.id].x));
+      pos[n.id].y=Math.max(MARGIN,Math.min(h-MARGIN,pos[n.id].y+vel[n.id].y));
+    });
+    return true;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Tag anchors — spread sub-groups within cluster zone
+// ══════════════════════════════════════════════════════════════════════════════
+function buildTagAnchors(contacts, w, h){
+  // Group by cluster+tag
+  const groups={};
+  contacts.forEach(c=>{
+    const key=`${c.cluster}::${c.tag||'__none__'}`;
+    if(!groups[key])groups[key]=[];
+    groups[key].push(c.email);
+  });
+
+  // For each cluster, spread its tag-groups in a mini arc around the anchor
+  const clusterGroups={internal:{},external:{},unset:{}};
+  Object.entries(groups).forEach(([key,emails])=>{
+    const[cluster,tag]=key.split('::');
+    clusterGroups[cluster][tag]=emails;
+  });
+
+  const tagAnchors={};
+  ['internal','external','unset'].forEach(cluster=>{
+    const base=clusterAnchor(cluster,w,h);
+    const tags=Object.keys(clusterGroups[cluster]);
+    const R=Math.min(w,h)*0.1;
+    tags.forEach((tag,i)=>{
+      const angle=tags.length>1?(2*Math.PI*i/tags.length)-Math.PI/2:0;
+      const r=tags.length>1?R:0;
+      const anchor={x:base.x+r*Math.cos(angle), y:base.y+r*Math.sin(angle)};
+      clusterGroups[cluster][tag].forEach(email=>{tagAnchors[email]=anchor;});
+    });
+  });
+  return tagAnchors;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SVG helpers
+// ══════════════════════════════════════════════════════════════════════════════
+const NS='http://www.w3.org/2000/svg';
+const el=(t,a={})=>{const e=document.createElementNS(NS,t);for(const[k,v]of Object.entries(a))e.setAttribute(k,v);return e;};
+const nodeRadius=(score,maxScore)=>14+(score/maxScore)*26;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// State
+// ══════════════════════════════════════════════════════════════════════════════
+let rawData=null, rafId=null, layout=null;
+const svg_=document.getElementById('svg');
+const wrap_=document.getElementById('canvas-wrap');
+const overlay_=document.getElementById('overlay');
+const detail_=document.getElementById('detail');
+const notice_=document.getElementById('no-data-notice');
+const inputFrom=document.getElementById('input-from');
+const inputTo=document.getElementById('input-to');
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Detail panel
+// ══════════════════════════════════════════════════════════════════════════════
+function showDetail(c,totals,col,maxVal){
+  const{sent,received,responded,score}=totals;
+  document.getElementById('d-dot').style.cssText=`width:10px;height:10px;border-radius:50%;flex-shrink:0;background:${rgba(col)};box-shadow:0 0 10px ${rgba(col,.7)}`;
+  document.getElementById('d-name').textContent=c.name||c.email.split('@')[0];
+  document.getElementById('d-email').textContent=c.email;
+  document.getElementById('d-score').textContent=score;
+  document.getElementById('d-score').style.color=rgba(col);
+  document.getElementById('d-swatch').style.cssText=`background:${rgba(col)};box-shadow:0 0 12px ${rgba(col,.6)}`;
+  document.getElementById('d-rgb').textContent=`rgb(${col.r},${col.g},${col.b})`;
+
+  // Category + tag pills
+  const meta=ContactStore.get(c.email);
+  const catClass=meta.category==='internal'?'d-cat-internal':meta.category==='external'?'d-cat-external':'d-cat-none';
+  const catLabel=meta.category==='internal'?'Internal':meta.category==='external'?'External':'Unset';
+  let metaHTML=`<span class="d-pill ${catClass}">${catLabel}</span>`;
+  if(meta.tag)metaHTML+=`<span class="d-pill d-tag-pill"># ${meta.tag}</span>`;
+  document.getElementById('d-meta').innerHTML=metaHTML;
+
+  document.getElementById('d-stats').innerHTML=[
+    {label:'Sent to',val:sent,color:ch.sent},
+    {label:'Received',val:received,color:ch.recv},
+    {label:'Responded',val:responded,color:ch.resp},
+  ].map(s=>`
+    <div class="stat-row"><span style="color:var(--dim)">${s.label}</span><span style="color:${s.color};font-weight:600">${s.val}</span></div>
+    <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(s.val/(maxVal||1)*100)}%;background:${s.color}"></div></div>
+  `).join('');
+  detail_.classList.add('visible');
+}
+function hideDetail(){detail_.classList.remove('visible')}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Cluster zone labels + boundary blobs
+// ══════════════════════════════════════════════════════════════════════════════
+function drawZones(svg, w, h){
+  const zones=[
+    {cluster:'internal',label:'INTERNAL',color:'#10d98a'},
+    {cluster:'external',label:'EXTERNAL',color:'#f59e0b'},
+    {cluster:'unset',   label:'UNSET',   color:'#4e607a'},
+  ];
+  zones.forEach(z=>{
+    const a=clusterAnchor(z.cluster,w,h);
+    const R=Math.min(w,h)*0.22;
+
+    // Soft halo
+    const halo=el('circle',{cx:a.x,cy:a.y,r:R,
+      fill:'none',stroke:z.color,'stroke-width':'1','stroke-dasharray':'4 6',opacity:'.18'});
+    svg.appendChild(halo);
+
+    // Subtle filled zone
+    const fill=el('circle',{cx:a.x,cy:a.y,r:R,
+      fill:z.color,opacity:'.03'});
+    svg.appendChild(fill);
+
+    // Zone label
+    const txt=el('text',{x:a.x,y:a.y-R-8,'text-anchor':'middle',
+      style:`font-size:9px;fill:${z.color};letter-spacing:3px;font-family:var(--mono);opacity:.5`});
+    txt.textContent=z.label;
+    svg.appendChild(txt);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Build SVG
+// ══════════════════════════════════════════════════════════════════════════════
+function buildSVG(contacts){
+  cancelAnimationFrame(rafId);
+  svg_.innerHTML='';
+
+  const w=wrap_.clientWidth||900, h=wrap_.clientHeight||580;
+  svg_.setAttribute('width',w);svg_.setAttribute('height',h);
+
+  const maxScore=Math.max(...contacts.map(c=>c.totals.score),1);
+  const maxVal=Math.max(...contacts.flatMap(c=>[c.totals.sent,c.totals.received,c.totals.responded]),1);
+
+  // Attach cluster + tag from store
+  const metaMap=ContactStore.load();
+  contacts.forEach(c=>{
+    const m=metaMap[c.email]||{};
+    c.cluster=m.category||'unset';
+    c.tag=m.tag||'';
+  });
+
+  // Tag anchors
+  const tagAnchors=buildTagAnchors(contacts,w,h);
+
+  // ── Defs ────────────────────────────────────────────────────────────────
+  const defs=el('defs');
+
+  contacts.forEach(c=>{
+    const col=computeRGB(c.totals.sent,c.totals.received,c.totals.responded,maxVal);
+    const id='g_'+c.email.replace(/[@.]/g,'_');
+    const rg=el('radialGradient',{id});
+    rg.append(el('stop',{offset:'0%','stop-color':rgba(col,1)}),
+              el('stop',{offset:'100%','stop-color':rgba(col,.05)}));
+    defs.append(rg);
+  });
+
+  const cg=el('radialGradient',{id:'cg'});
+  cg.append(el('stop',{offset:'0%','stop-color':'#00cfff','stop-opacity':'.7'}),
+            el('stop',{offset:'100%','stop-color':'#0a1a40','stop-opacity':'.1'}));
+  defs.append(cg);
+
+  function mkFilter(id,sd,strength=1){
+    const f=el('filter',{id,'color-interpolation-filters':'sRGB'});
+    f.append(el('feGaussianBlur',{stdDeviation:sd,result:'blur'}));
+    const cm=el('feComponentTransfer',{in:'blur',result:'boosted'});
+    ['R','G','B'].forEach(ch=>{
+      const ft=el(`feFunc${ch}`,{type:'linear',slope:String(strength),intercept:'0'});
+      cm.append(ft);
+    });
+    f.append(cm);
+    const m=el('feMerge');
+    m.append(el('feMergeNode',{in:'boosted'}),el('feMergeNode',{in:'SourceGraphic'}));
+    f.append(m);return f;
+  }
+  defs.append(mkFilter('glow','3.5',1.4),mkFilter('glowS','7',1.8));
+  svg_.append(defs);
+
+  // ── Background grid dots ─────────────────────────────────────────────────
+  const gridG=el('g',{opacity:'.12'});
+  for(let x=0;x<w;x+=36)for(let y=0;y<h;y+=36)
+    gridG.append(el('circle',{cx:x,cy:y,r:'1',fill:'#3a4a6a'}));
+  svg_.append(gridG);
+
+  // ── Zone backgrounds ─────────────────────────────────────────────────────
+  drawZones(svg_,w,h);
+
+  const lineGrp=el('g');const nodeGrp=el('g');
+  svg_.append(lineGrp,nodeGrp);
+
+  // ── Lines to cluster anchor (not to center) ──────────────────────────────
+  const lineEls={};
+  contacts.forEach(c=>{
+    const col=computeRGB(c.totals.sent,c.totals.received,c.totals.responded,maxVal);
+    const anchor=clusterAnchor(c.cluster,w,h);
+    const ln=el('line',{x1:anchor.x,y1:anchor.y,x2:anchor.x,y2:anchor.y,
+      stroke:rgba(col,.22),'stroke-width':(c.totals.score/maxScore)*1.4+0.4,'stroke-dasharray':'3 6'});
+    lineEls[c.email]=ln;lineGrp.append(ln);
+  });
+
+  // ── Nodes ────────────────────────────────────────────────────────────────
+  const nodeGroups={};
+  contacts.forEach(c=>{
+    const col=computeRGB(c.totals.sent,c.totals.received,c.totals.responded,maxVal);
+    const r=nodeRadius(c.totals.score,maxScore);
+    const gid='g_'+c.email.replace(/[@.]/g,'_');
+    const g=el('g',{style:'cursor:pointer'});
+
+    // Outer glow ring (hover)
+    const ring=el('circle',{cx:0,cy:0,r:r+10,fill:'none',
+      stroke:rgba(col,.5),'stroke-width':'2',filter:'url(#glow)',opacity:'0'});
+    // Main body
+    const body=el('circle',{cx:0,cy:0,r,
+      fill:`url(#${gid})`,filter:'url(#glow)',
+      stroke:rgba(col,.7),'stroke-width':'1.2'});
+    // Dark inner
+    const inner=el('circle',{cx:0,cy:0,r:r*.52,fill:'#05070d','fill-opacity':'.75'});
+    // Score text
+    const scoreEl=el('text',{x:0,y:1,'text-anchor':'middle','dominant-baseline':'middle',
+      style:`font-size:${Math.max(8,r*.42)}px;fill:${rgba(col,1)};font-family:var(--mono);font-weight:600;user-select:none`});
+    scoreEl.textContent=c.totals.score;
+    // Name label
+    const label=el('text',{x:0,y:r+13,'text-anchor':'middle',
+      style:'font-size:9px;fill:var(--dim);font-family:var(--mono);letter-spacing:.3px;user-select:none'});
+    label.textContent=c.name||c.email.split('@')[0];
+    // Tag label (small, below name)
+    const meta=metaMap[c.email]||{};
+    const tagEl=el('text',{x:0,y:r+23,'text-anchor':'middle',
+      style:'font-size:8px;fill:var(--muted);font-family:var(--mono);user-select:none;font-style:italic'});
+    if(meta.tag)tagEl.textContent=`#${meta.tag}`;
+
+    g.append(ring,body,inner,scoreEl,label,tagEl);
+
+    const onEnter=()=>{
+      ring.setAttribute('opacity','1');
+      body.setAttribute('filter','url(#glowS)');body.setAttribute('stroke',rgba(col,1));body.setAttribute('stroke-width','2');
+      label.setAttribute('style',`font-size:10px;fill:${rgba(col)};font-family:var(--mono);letter-spacing:.3px;user-select:none;font-weight:600`);
+      lineEls[c.email].setAttribute('stroke',rgba(col,.6));
+      lineEls[c.email].setAttribute('stroke-width','2');
+      lineEls[c.email].removeAttribute('stroke-dasharray');
+      showDetail(c,c.totals,col,maxVal);
+    };
+    const onLeave=()=>{
+      ring.setAttribute('opacity','0');
+      body.setAttribute('filter','url(#glow)');body.setAttribute('stroke',rgba(col,.7));body.setAttribute('stroke-width','1.2');
+      label.setAttribute('style','font-size:9px;fill:var(--dim);font-family:var(--mono);letter-spacing:.3px;user-select:none');
+      lineEls[c.email].setAttribute('stroke',rgba(col,.22));
+      lineEls[c.email].setAttribute('stroke-width',(c.totals.score/maxScore)*1.4+0.4);
+      lineEls[c.email].setAttribute('stroke-dasharray','3 6');
+      hideDetail();
+    };
+    g.addEventListener('mouseenter',onEnter);
+    g.addEventListener('mouseleave',onLeave);
+    nodeGroups[c.email]=g;nodeGrp.append(g);
+  });
+
+  // ── Cluster anchor dots ──────────────────────────────────────────────────
+  [
+    {cluster:'internal',color:'#10d98a'},
+    {cluster:'external',color:'#f59e0b'},
+    {cluster:'unset',   color:'#4e607a'},
+  ].forEach(({cluster,color})=>{
+    const a=clusterAnchor(cluster,w,h);
+    nodeGrp.append(
+      el('circle',{cx:a.x,cy:a.y,r:8,fill:color,opacity:'.2',filter:'url(#glow)'}),
+      el('circle',{cx:a.x,cy:a.y,r:4,fill:color,opacity:'.6'}),
+    );
+  });
+
+  // ── Physics ──────────────────────────────────────────────────────────────
+  const nodes=contacts.map(c=>({
+    id:c.email,score:c.totals.score,cluster:c.cluster,tag:c.tag,
+    r:nodeRadius(c.totals.score,maxScore),
+    tagAnchor:tagAnchors[c.email],
+  }));
+  layout=new ForceLayout(nodes,w,h);
+
+  function frame(){
+    layout.tick();
+    contacts.forEach(c=>{
+      const p=layout.pos[c.email];
+      nodeGroups[c.email].setAttribute('transform',`translate(${p.x},${p.y})`);
+      lineEls[c.email].setAttribute('x2',p.x);lineEls[c.email].setAttribute('y2',p.y);
+    });
+    rafId=requestAnimationFrame(frame);
+  }
+  rafId=requestAnimationFrame(frame);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Apply window
+// ══════════════════════════════════════════════════════════════════════════════
+function applyWindow(){
+  if(!rawData)return;
+  const fromYM=inputFrom.value, toYM=inputTo.value;
+  if(!fromYM||!toYM||fromYM>toYM){
+    inputFrom.style.borderColor=fromYM>toYM?'#ff3d6e':'';
+    inputTo.style.borderColor  =fromYM>toYM?'#ff3d6e':'';
+    return;
+  }
+  inputFrom.style.borderColor='';inputTo.style.borderColor='';
+
+  const TOP_N=Math.max(1,parseInt(document.getElementById('input-topn').value)||20);
+  const MIN_S=Math.max(1,parseInt(document.getElementById('input-min').value)||1);
+
+  const metaMap=ContactStore.load();
+  const scored=rawData.contacts
+    .map(c=>({...c,totals:sumMonths(c,fromYM,toYM)}))
+    .filter(c=>c.totals.score>=MIN_S)
+    .sort((a,b)=>b.totals.score-a.totals.score)
+    .slice(0,TOP_N);
+
+  document.getElementById('ft-contacts').textContent =`CONTACTS: ${scored.length}`;
+  document.getElementById('ft-total').textContent    =`INTERACTIONS: ${scored.reduce((a,c)=>a+c.totals.score,0)}`;
+  document.getElementById('ft-top').textContent      =scored.length?`TOP: ${scored[0].name||scored[0].email.split('@')[0]}`:'TOP: —';
+  document.getElementById('ft-window').textContent   =`${fromYM} → ${toYM}`;
+
+  const intCount=scored.filter(c=>(metaMap[c.email]||{}).category==='internal').length;
+  const extCount=scored.filter(c=>(metaMap[c.email]||{}).category==='external').length;
+  const unCount =scored.length-intCount-extCount;
+  document.getElementById('ft-clusters').textContent=`INT:${intCount} EXT:${extCount} UNSET:${unCount}`;
+
+  if(!scored.length){
+    cancelAnimationFrame(rafId);svg_.innerHTML='';
+    notice_.classList.add('visible');return;
+  }
+  notice_.classList.remove('visible');
+  buildSVG(scored);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Load
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadData(){
+  try{
+    const res=await fetch('email_data.json');
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    rawData=await res.json();
+  }catch(e){
+    overlay_.innerHTML=`
+      <div style="font-size:26px">⚠</div>
+      <span style="color:var(--bright)">email_data.json not found</span>
+      <div class="error-hint">Place <code>email_data.json</code> in the same folder as <code>index.html</code> and push to GitHub.</div>`;
+    return;
+  }
+  inputFrom.min=rawData.data_from;inputFrom.max=rawData.data_to;
+  inputTo.min=rawData.data_from;inputTo.max=rawData.data_to;
+  inputFrom.value=rawData.data_from;inputTo.value=rawData.data_to;
+  overlay_.classList.add('hidden');
+  applyWindow();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Color pickers
+// ══════════════════════════════════════════════════════════════════════════════
+function wirePicker(id,key){
+  const p=document.getElementById(id);
+  const go=e=>{ch[key]=e.target.value;syncSwatches();applyWindow();};
+  p.addEventListener('input',go);p.addEventListener('change',go);
+}
+wirePicker('pick-sent','sent');wirePicker('pick-recv','recv');wirePicker('pick-resp','resp');
+document.getElementById('reset-colors').addEventListener('click',()=>{
+  Object.assign(ch,DEFAULTS);
+  document.getElementById('pick-sent').value=DEFAULTS.sent;
+  document.getElementById('pick-recv').value=DEFAULTS.recv;
+  document.getElementById('pick-resp').value=DEFAULTS.resp;
+  syncSwatches();applyWindow();
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Events
+// ══════════════════════════════════════════════════════════════════════════════
+document.getElementById('apply-btn').addEventListener('click',applyWindow);
+[inputFrom,inputTo,
+ document.getElementById('input-topn'),
+ document.getElementById('input-min')]
+.forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter')applyWindow();}));
+
+// Re-render when returning from table.html (metadata may have changed)
+window.addEventListener('focus',()=>{if(rawData)applyWindow();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&rawData)applyWindow();});
+
+let rt;
+window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(applyWindow,200);});
+
+loadData();
+</script>
+</body>
+</html>
