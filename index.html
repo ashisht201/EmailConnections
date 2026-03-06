@@ -17,9 +17,6 @@
     --dim:     #4a5568;
     --text:    #c8d0e0;
     --bright:  #e2e8f0;
-    --blue:    #4488ff;
-    --red:     #ff4455;
-    --yellow:  #ffcc00;
     --mono:    'IBM Plex Mono', monospace;
     --sans:    'IBM Plex Sans', sans-serif;
   }
@@ -36,49 +33,66 @@
   .header-titles .eyebrow { font-size:10px; letter-spacing:4px; color:var(--muted); text-transform:uppercase; margin-bottom:1px; }
   .header-titles .title   { font-family:var(--sans); font-size:17px; font-weight:700; color:var(--bright); letter-spacing:-.3px; }
 
-  /* ── Date range controls ── */
-  .date-range {
-    display:flex; align-items:center; gap:10px; margin-left:auto; flex-wrap:wrap;
-  }
+  /* ── Date range ── */
+  .date-range { display:flex; align-items:center; gap:10px; margin-left:auto; flex-wrap:wrap; }
   .date-range label { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
   .date-range input[type="month"] {
     background:var(--surface); border:1px solid var(--muted); border-radius:4px;
     color:var(--text); font-family:var(--mono); font-size:12px;
-    padding:5px 9px; outline:none; cursor:pointer;
-    transition:border-color .15s;
-    /* remove native calendar icon tint */
+    padding:5px 9px; outline:none; cursor:pointer; transition:border-color .15s;
     color-scheme: dark;
   }
   .date-range input[type="month"]:focus,
-  .date-range input[type="month"]:hover { border-color:var(--blue); }
+  .date-range input[type="month"]:hover { border-color:#4488ff; }
   .date-range .sep { color:var(--muted); font-size:11px; }
-
   #apply-btn {
-    background:var(--blue); border:none; border-radius:4px;
+    background:#4488ff; border:none; border-radius:4px;
     color:#fff; font-family:var(--mono); font-size:11px; letter-spacing:1px;
-    text-transform:uppercase; padding:6px 14px; cursor:pointer;
-    transition:opacity .15s;
+    text-transform:uppercase; padding:6px 14px; cursor:pointer; transition:opacity .15s;
   }
   #apply-btn:hover { opacity:.85; }
-  #apply-btn:active { opacity:.7; }
-
-  /* pill showing current window */
   #window-pill {
     font-size:10px; letter-spacing:1px; color:var(--dim);
     background:var(--surface); border:1px solid var(--border);
     border-radius:10px; padding:3px 10px; white-space:nowrap;
   }
 
-  /* ── Legend ── */
+  /* ── Legend + color pickers ── */
   #legend {
     flex-shrink:0; padding:5px 24px;
     border-bottom:1px solid #0e1525;
-    display:flex; gap:18px; align-items:center; flex-wrap:wrap;
-    font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--dim);
+    display:flex; gap:6px; align-items:center; flex-wrap:wrap;
   }
-  .legend-item { display:flex; align-items:center; gap:5px; }
-  .legend-dot  { width:7px; height:7px; border-radius:50%; }
-  .legend-right { margin-left:auto; color:var(--muted); }
+
+  /* Each channel: swatch (click→picker) + label */
+  .ch-item {
+    display:flex; align-items:center; gap:5px;
+    font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--dim);
+    margin-right:10px;
+  }
+  .ch-swatch {
+    width:14px; height:14px; border-radius:3px; cursor:pointer; flex-shrink:0;
+    border:1px solid rgba(255,255,255,.12);
+    transition:transform .12s, box-shadow .12s;
+    position:relative;
+  }
+  .ch-swatch:hover { transform:scale(1.25); box-shadow:0 0 8px currentColor; }
+
+  /* Hidden native color input overlaid on the swatch */
+  .ch-swatch input[type="color"] {
+    position:absolute; inset:0; width:100%; height:100%;
+    opacity:0; cursor:pointer; border:none; padding:0;
+  }
+
+  /* Reset button */
+  #reset-colors {
+    font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted);
+    background:none; border:1px solid var(--muted); border-radius:3px;
+    padding:2px 7px; cursor:pointer; margin-left:2px; transition:color .15s, border-color .15s;
+  }
+  #reset-colors:hover { color:var(--text); border-color:var(--dim); }
+
+  .legend-right { margin-left:auto; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
 
   /* ── Canvas ── */
   #canvas-wrap { flex:1; position:relative; overflow:hidden; }
@@ -101,7 +115,7 @@
   hr.div     { border:none; border-top:1px solid var(--border); margin:10px 0; }
   .score-row { display:flex; justify-content:space-between; }
   .swatch-row{ display:flex; align-items:center; gap:7px; margin-top:8px; }
-  .swatch    { width:22px; height:22px; border-radius:4px; flex-shrink:0; }
+  .result-swatch { width:22px; height:22px; border-radius:4px; flex-shrink:0; }
 
   /* ── Footer ── */
   footer {
@@ -118,12 +132,12 @@
     font-size:13px; color:var(--dim); background:var(--bg);
   }
   #overlay.hidden { display:none; }
-  .spinner { width:32px; height:32px; border:2px solid var(--muted); border-top-color:var(--blue); border-radius:50%; animation:spin .8s linear infinite; }
+  .spinner { width:32px; height:32px; border:2px solid var(--muted); border-top-color:#4488ff; border-radius:50%; animation:spin .8s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
   .error-hint { font-size:10px; color:var(--muted); max-width:340px; text-align:center; line-height:1.8; }
   code { background:#1a2540; padding:2px 5px; border-radius:3px; color:#66aaff; font-family:var(--mono); }
 
-  /* ── No-data notice (inside canvas, not blocking) ── */
+  /* ── No-data notice ── */
   #no-data-notice {
     position:absolute; inset:0; display:none;
     flex-direction:column; align-items:center; justify-content:center; gap:8px;
@@ -140,7 +154,6 @@
       <div class="eyebrow">Mailbox Intelligence</div>
       <div class="title">Communication Gravity Map</div>
     </div>
-
     <div class="date-range">
       <label>From</label>
       <input type="month" id="input-from" />
@@ -152,10 +165,27 @@
     </div>
   </header>
 
+  <!-- Legend with inline color pickers -->
   <div id="legend">
-    <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Sent to</div>
-    <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Received</div>
-    <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>Responded</div>
+    <div class="ch-item">
+      <div class="ch-swatch" id="swatch-sent" title="Click to change Sent color">
+        <input type="color" id="pick-sent" value="#4488ff" />
+      </div>
+      Sent to
+    </div>
+    <div class="ch-item">
+      <div class="ch-swatch" id="swatch-recv" title="Click to change Received color">
+        <input type="color" id="pick-recv" value="#ff4455" />
+      </div>
+      Received
+    </div>
+    <div class="ch-item">
+      <div class="ch-swatch" id="swatch-resp" title="Click to change Responded color">
+        <input type="color" id="pick-resp" value="#ffcc00" />
+      </div>
+      Responded
+    </div>
+    <button id="reset-colors" title="Reset to defaults">Reset</button>
     <div class="legend-right">Size &amp; proximity = interaction intensity</div>
   </div>
 
@@ -164,15 +194,12 @@
       <div class="spinner"></div>
       <span>Loading email_data.json…</span>
     </div>
-
     <div id="no-data-notice">
       <span style="font-size:22px">∅</span>
       <span>No contacts meet the threshold for this period.</span>
       <span style="font-size:10px;color:var(--muted)">Try widening the date range.</span>
     </div>
-
     <svg id="svg"></svg>
-
     <div id="detail">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
         <div id="d-dot" style="width:10px;height:10px;border-radius:50%;flex-shrink:0"></div>
@@ -188,7 +215,7 @@
         <span id="d-score" style="font-weight:600"></span>
       </div>
       <div class="swatch-row">
-        <div class="swatch" id="d-swatch"></div>
+        <div class="result-swatch" id="d-swatch"></div>
         <div style="color:var(--dim);font-size:10px" id="d-rgb"></div>
       </div>
     </div>
@@ -205,40 +232,77 @@
 
 <script>
 // ══════════════════════════════════════════════════════════════════════════════
-// Utilities
+// Channel color state — these are the three user-configurable base colors
 // ══════════════════════════════════════════════════════════════════════════════
+
+const DEFAULTS = { sent: '#4488ff', recv: '#ff4455', resp: '#ffcc00' };
+
+const channelColors = { ...DEFAULTS };
+
+/** Parse "#rrggbb" → {r,g,b} */
+function hexToRGB(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+/**
+ * Blend the three channel colors by their normalised weights.
+ * Each channel contributes its color scaled by (value/maxVal),
+ * then we clamp+boost for visibility — same logic as before but
+ * now using user-chosen hues instead of hardcoded R/G/B axes.
+ */
+function computeRGB(sent, received, responded, maxVal) {
+  const max = maxVal || 1;
+  const wS = sent      / max;   // weight 0-1
+  const wR = received  / max;
+  const wD = responded / max;
+
+  const cS = hexToRGB(channelColors.sent);
+  const cR = hexToRGB(channelColors.recv);
+  const cD = hexToRGB(channelColors.resp);
+
+  // Additive blend scaled by weight
+  const boost = c => Math.min(255, Math.round(c + 55));
+  const clamp = c => Math.min(255, Math.max(0, Math.round(c)));
+
+  return {
+    r: boost(clamp(cS.r*wS + cR.r*wR + cD.r*wD)),
+    g: boost(clamp(cS.g*wS + cR.g*wR + cD.g*wD)),
+    b: boost(clamp(cS.b*wS + cR.b*wR + cD.b*wD)),
+  };
+}
 
 const rgba = ({r,g,b}, a=1) => `rgba(${r},${g},${b},${a})`;
 
-function computeRGB(sent, received, responded, maxVal) {
-  const norm  = v => Math.min(255, Math.round((v / (maxVal||1)) * 255));
-  const boost = c => Math.min(255, c + 60);
-  return { r: boost(norm(received)), g: boost(norm(responded)), b: boost(norm(sent)) };
+// Sync swatch background to picker value
+function syncSwatches() {
+  document.getElementById('swatch-sent').style.background = channelColors.sent;
+  document.getElementById('swatch-recv').style.background = channelColors.recv;
+  document.getElementById('swatch-resp').style.background = channelColors.resp;
+  // also sync box-shadow hint color
+  document.getElementById('swatch-sent').style.color = channelColors.sent;
+  document.getElementById('swatch-recv').style.color = channelColors.recv;
+  document.getElementById('swatch-resp').style.color = channelColors.resp;
 }
+syncSwatches();
 
-// ── Month helpers ─────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// Month helpers
+// ══════════════════════════════════════════════════════════════════════════════
 
-/** "2024-03" → Date (1st of that month, UTC) */
-function monthToDate(ym) {
-  const [y, m] = ym.split('-');
-  return new Date(Date.UTC(+y, +m - 1, 1));
-}
+const ymLte = (a,b) => a <= b;
+const ymGte = (a,b) => a >= b;
 
-/** Compare two "YYYY-MM" strings */
-const ymLte = (a, b) => a <= b;
-const ymGte = (a, b) => a >= b;
-
-/** Sum a contact's months within [fromYM, toYM] inclusive */
 function sumMonths(contact, fromYM, toYM) {
-  let sent = 0, received = 0, responded = 0;
-  for (const [m, v] of Object.entries(contact.months)) {
-    if (ymGte(m, fromYM) && ymLte(m, toYM)) {
+  let sent=0, received=0, responded=0;
+  for (const [m,v] of Object.entries(contact.months)) {
+    if (ymGte(m,fromYM) && ymLte(m,toYM)) {
       sent      += v.sent      || 0;
       received  += v.received  || 0;
       responded += v.responded || 0;
     }
   }
-  return { sent, received, responded, score: sent + received + responded };
+  return { sent, received, responded, score: sent+received+responded };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -247,41 +311,36 @@ function sumMonths(contact, fromYM, toYM) {
 
 class ForceLayout {
   constructor(nodes, w, h) {
-    this.w = w; this.h = h; this.iter = 0; this.MAX = 420;
-    const maxScore = Math.max(...nodes.map(n => n.score), 1);
-    this.pos = {}; this.vel = {};
-    nodes.forEach((n, i) => {
-      const angle = (2 * Math.PI * i) / nodes.length;
-      const frac  = 1 - n.score / maxScore;
-      const dist  = 80 + frac * Math.min(w, h) * 0.32;
-      this.pos[n.id] = { x: w/2 + dist*Math.cos(angle), y: h/2 + dist*Math.sin(angle) };
-      this.vel[n.id] = { x: 0, y: 0 };
+    this.w=w; this.h=h; this.iter=0; this.MAX=420;
+    const maxScore = Math.max(...nodes.map(n=>n.score),1);
+    this.pos={}; this.vel={};
+    nodes.forEach((n,i) => {
+      const angle = (2*Math.PI*i)/nodes.length;
+      const frac  = 1 - n.score/maxScore;
+      const dist  = 80 + frac*Math.min(w,h)*0.32;
+      this.pos[n.id] = { x:w/2+dist*Math.cos(angle), y:h/2+dist*Math.sin(angle) };
+      this.vel[n.id] = { x:0, y:0 };
     });
     this.nodes = nodes;
   }
-
   tick() {
     if (this.iter++ > this.MAX) return false;
-    const { w, h, pos, vel, nodes } = this;
-    const cx = w/2, cy = h/2;
-    const maxScore = Math.max(...nodes.map(n => n.score), 1);
-    const MARGIN = 64;
+    const {w,h,pos,vel,nodes}=this, cx=w/2, cy=h/2, MARGIN=64;
+    const maxScore = Math.max(...nodes.map(n=>n.score),1);
     nodes.forEach(n => {
-      const idealDist = 88 + (1 - n.score/maxScore) * Math.min(w,h) * 0.34;
-      const dx = pos[n.id].x - cx, dy = pos[n.id].y - cy;
-      const d  = Math.sqrt(dx*dx + dy*dy) || 1;
-      const f  = (d - idealDist) * 0.045;
-      vel[n.id].x -= dx/d * f;
-      vel[n.id].y -= dy/d * f;
+      const idealDist = 88 + (1-n.score/maxScore)*Math.min(w,h)*0.34;
+      const dx=pos[n.id].x-cx, dy=pos[n.id].y-cy, d=Math.sqrt(dx*dx+dy*dy)||1;
+      const f=(d-idealDist)*0.045;
+      vel[n.id].x -= dx/d*f; vel[n.id].y -= dy/d*f;
       nodes.forEach(o => {
-        if (o.id === n.id) return;
-        const ox = pos[n.id].x - pos[o.id].x, oy = pos[n.id].y - pos[o.id].y;
-        const od = Math.sqrt(ox*ox + oy*oy) || 1;
-        if (od < 95) { const rep = (95-od)*0.055/od; vel[n.id].x += ox*rep; vel[n.id].y += oy*rep; }
+        if(o.id===n.id)return;
+        const ox=pos[n.id].x-pos[o.id].x, oy=pos[n.id].y-pos[o.id].y;
+        const od=Math.sqrt(ox*ox+oy*oy)||1;
+        if(od<95){const rep=(95-od)*0.055/od; vel[n.id].x+=ox*rep; vel[n.id].y+=oy*rep;}
       });
-      vel[n.id].x *= 0.84; vel[n.id].y *= 0.84;
-      pos[n.id].x = Math.max(MARGIN, Math.min(w-MARGIN, pos[n.id].x + vel[n.id].x));
-      pos[n.id].y = Math.max(MARGIN, Math.min(h-MARGIN, pos[n.id].y + vel[n.id].y));
+      vel[n.id].x*=0.84; vel[n.id].y*=0.84;
+      pos[n.id].x=Math.max(MARGIN,Math.min(w-MARGIN,pos[n.id].x+vel[n.id].x));
+      pos[n.id].y=Math.max(MARGIN,Math.min(h-MARGIN,pos[n.id].y+vel[n.id].y));
     });
     return true;
   }
@@ -291,21 +350,19 @@ class ForceLayout {
 // SVG helpers
 // ══════════════════════════════════════════════════════════════════════════════
 
-const NS = 'http://www.w3.org/2000/svg';
-function el(tag, attrs={}) {
-  const e = document.createElementNS(NS, tag);
-  for (const [k,v] of Object.entries(attrs)) e.setAttribute(k, v);
+const NS='http://www.w3.org/2000/svg';
+function el(tag,attrs={}) {
+  const e=document.createElementNS(NS,tag);
+  for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);
   return e;
 }
-function nodeRadius(score, maxScore) { return 18 + (score / maxScore) * 28; }
+function nodeRadius(score,maxScore){return 18+(score/maxScore)*28;}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // State
 // ══════════════════════════════════════════════════════════════════════════════
 
-let rawData  = null;   // full JSON from file
-let rafId    = null;
-let layout   = null;
+let rawData=null, rafId=null, layout=null;
 
 const svg_     = document.getElementById('svg');
 const wrap_    = document.getElementById('canvas-wrap');
@@ -314,120 +371,117 @@ const detail_  = document.getElementById('detail');
 const notice_  = document.getElementById('no-data-notice');
 const inputFrom = document.getElementById('input-from');
 const inputTo   = document.getElementById('input-to');
-const applyBtn  = document.getElementById('apply-btn');
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Detail panel
 // ══════════════════════════════════════════════════════════════════════════════
 
 function showDetail(c, totals, col, maxVal) {
-  const { sent, received, responded, score } = totals;
+  const {sent,received,responded,score}=totals;
   document.getElementById('d-dot').style.cssText =
     `width:10px;height:10px;border-radius:50%;flex-shrink:0;background:${rgba(col)};box-shadow:0 0 8px ${rgba(col,.6)}`;
-  document.getElementById('d-name').textContent  = c.name || c.email.split('@')[0];
+  document.getElementById('d-name').textContent  = c.name||c.email.split('@')[0];
   document.getElementById('d-email').textContent = c.email;
   document.getElementById('d-score').textContent = score;
   document.getElementById('d-score').style.color = rgba(col);
   document.getElementById('d-swatch').style.cssText =
-    `width:22px;height:22px;border-radius:4px;background:${rgba(col)};box-shadow:0 0 10px ${rgba(col,.5)}`;
+    `background:${rgba(col)};box-shadow:0 0 10px ${rgba(col,.5)}`;
   document.getElementById('d-rgb').textContent = `rgb(${col.r}, ${col.g}, ${col.b})`;
+
   document.getElementById('d-stats').innerHTML = [
-    { label:'Sent to',   val:sent,      color:'var(--blue)'   },
-    { label:'Received',  val:received,  color:'var(--red)'    },
-    { label:'Responded', val:responded, color:'var(--yellow)' },
-  ].map(s => `
+    {label:'Sent to',   val:sent,      color:channelColors.sent},
+    {label:'Received',  val:received,  color:channelColors.recv},
+    {label:'Responded', val:responded, color:channelColors.resp},
+  ].map(s=>`
     <div class="stat-row"><span style="color:var(--dim)">${s.label}</span><span style="color:${s.color}">${s.val}</span></div>
     <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(s.val/(maxVal||1)*100)}%;background:${s.color}"></div></div>
   `).join('');
   detail_.classList.add('visible');
 }
-function hideDetail() { detail_.classList.remove('visible'); }
+function hideDetail(){detail_.classList.remove('visible');}
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Build / rebuild the SVG for a given filtered contact list
+// Build SVG
 // ══════════════════════════════════════════════════════════════════════════════
 
 function buildSVG(contacts) {
   cancelAnimationFrame(rafId);
-  svg_.innerHTML = '';
+  svg_.innerHTML='';
 
-  const w = wrap_.clientWidth  || 860;
-  const h = wrap_.clientHeight || 560;
-  svg_.setAttribute('width',  w);
-  svg_.setAttribute('height', h);
-  const cx = w/2, cy = h/2;
+  const w=wrap_.clientWidth||860, h=wrap_.clientHeight||560;
+  svg_.setAttribute('width',w); svg_.setAttribute('height',h);
+  const cx=w/2, cy=h/2;
 
-  // contacts already have .totals attached
-  const maxScore = Math.max(...contacts.map(c => c.totals.score), 1);
-  const maxVal   = Math.max(...contacts.flatMap(c => [c.totals.sent, c.totals.received, c.totals.responded]), 1);
+  const maxScore = Math.max(...contacts.map(c=>c.totals.score),1);
+  const maxVal   = Math.max(...contacts.flatMap(c=>[c.totals.sent,c.totals.received,c.totals.responded]),1);
 
-  // ── Defs ──────────────────────────────────────────────────────────────
-  const defs = el('defs');
-  contacts.forEach(c => {
-    const col = computeRGB(c.totals.sent, c.totals.received, c.totals.responded, maxVal);
-    const rg  = el('radialGradient', { id: 'g_'+c.email.replace(/[@.]/g,'_') });
-    rg.append(el('stop',{offset:'0%','stop-color':rgba(col,.95)}), el('stop',{offset:'100%','stop-color':rgba(col,.1)}));
+  // Defs
+  const defs=el('defs');
+  contacts.forEach(c=>{
+    const col=computeRGB(c.totals.sent,c.totals.received,c.totals.responded,maxVal);
+    const rg=el('radialGradient',{id:'g_'+c.email.replace(/[@.]/g,'_')});
+    rg.append(el('stop',{offset:'0%','stop-color':rgba(col,.95)}),
+              el('stop',{offset:'100%','stop-color':rgba(col,.1)}));
     defs.append(rg);
   });
-  const cg = el('radialGradient', {id:'cg'});
+  const cg=el('radialGradient',{id:'cg'});
   cg.append(el('stop',{offset:'0%','stop-color':'#4466cc','stop-opacity':'.6'}),
             el('stop',{offset:'100%','stop-color':'#1a2550','stop-opacity':'.1'}));
   defs.append(cg);
-  function mkFilter(id, sd) {
-    const f = el('filter',{id}), b = el('feGaussianBlur',{stdDeviation:sd,result:'blur'}), m = el('feMerge');
-    m.append(el('feMergeNode',{in:'blur'}), el('feMergeNode',{in:'SourceGraphic'}));
-    f.append(b,m); return f;
+  function mkFilter(id,sd){
+    const f=el('filter',{id}),b=el('feGaussianBlur',{stdDeviation:sd,result:'blur'}),m=el('feMerge');
+    m.append(el('feMergeNode',{in:'blur'}),el('feMergeNode',{in:'SourceGraphic'}));
+    f.append(b,m);return f;
   }
-  defs.append(mkFilter('glow','3'), mkFilter('glowS','7'));
+  defs.append(mkFilter('glow','3'),mkFilter('glowS','7'));
   svg_.append(defs);
 
-  // ── Rings ──────────────────────────────────────────────────────────────
-  [.17,.31,.46].forEach(r =>
+  // Rings
+  [.17,.31,.46].forEach(r=>
     svg_.append(el('circle',{cx,cy,r:Math.min(w,h)*r,fill:'none',stroke:'#1a2035','stroke-width':'.5','stroke-dasharray':'3 9'})));
 
-  const lineGrp = el('g'); const nodeGrp = el('g');
-  svg_.append(lineGrp, nodeGrp);
+  const lineGrp=el('g'), nodeGrp=el('g');
+  svg_.append(lineGrp,nodeGrp);
 
-  // ── Lines ──────────────────────────────────────────────────────────────
-  const lineEls = {};
-  contacts.forEach(c => {
-    const col = computeRGB(c.totals.sent, c.totals.received, c.totals.responded, maxVal);
-    const ln  = el('line',{x1:cx,y1:cy,x2:cx,y2:cy,
+  // Lines
+  const lineEls={};
+  contacts.forEach(c=>{
+    const col=computeRGB(c.totals.sent,c.totals.received,c.totals.responded,maxVal);
+    const ln=el('line',{x1:cx,y1:cy,x2:cx,y2:cy,
       stroke:rgba(col,.18),'stroke-width':(c.totals.score/maxScore)*1.2+0.3,'stroke-dasharray':'4 7'});
-    lineEls[c.email] = ln;
-    lineGrp.append(ln);
+    lineEls[c.email]=ln; lineGrp.append(ln);
   });
 
-  // ── Nodes ──────────────────────────────────────────────────────────────
-  const nodeGroups = {};
-  contacts.forEach(c => {
-    const col = computeRGB(c.totals.sent, c.totals.received, c.totals.responded, maxVal);
-    const r   = nodeRadius(c.totals.score, maxScore);
-    const gid = 'g_'+c.email.replace(/[@.]/g,'_');
-    const g   = el('g',{style:'cursor:pointer'});
+  // Nodes
+  const nodeGroups={};
+  contacts.forEach(c=>{
+    const col=computeRGB(c.totals.sent,c.totals.received,c.totals.responded,maxVal);
+    const r=nodeRadius(c.totals.score,maxScore);
+    const gid='g_'+c.email.replace(/[@.]/g,'_');
+    const g=el('g',{style:'cursor:pointer'});
 
-    const ring  = el('circle',{cx:0,cy:0,r:r+9,fill:'none',stroke:rgba(col,.35),'stroke-width':'1.8',filter:'url(#glow)',opacity:'0'});
-    const body  = el('circle',{cx:0,cy:0,r,fill:`url(#${gid})`,filter:'url(#glow)',stroke:rgba(col,.4),'stroke-width':'.8'});
-    const inner = el('circle',{cx:0,cy:0,r:r*.55,fill:'#07090f','fill-opacity':'.7'});
-    const score = el('text',{x:0,y:1,'text-anchor':'middle','dominant-baseline':'middle',
+    const ring =el('circle',{cx:0,cy:0,r:r+9,fill:'none',stroke:rgba(col,.35),'stroke-width':'1.8',filter:'url(#glow)',opacity:'0'});
+    const body =el('circle',{cx:0,cy:0,r,fill:`url(#${gid})`,filter:'url(#glow)',stroke:rgba(col,.4),'stroke-width':'.8'});
+    const inner=el('circle',{cx:0,cy:0,r:r*.55,fill:'#07090f','fill-opacity':'.7'});
+    const score=el('text',{x:0,y:1,'text-anchor':'middle','dominant-baseline':'middle',
       style:`font-size:${Math.max(8,r*.38)}px;fill:${rgba(col,.9)};font-family:var(--mono);font-weight:600;user-select:none`});
-    score.textContent = c.totals.score;
-    const label = el('text',{x:0,y:r+14,'text-anchor':'middle',
+    score.textContent=c.totals.score;
+    const label=el('text',{x:0,y:r+14,'text-anchor':'middle',
       style:'font-size:9px;fill:var(--dim);font-family:var(--mono);letter-spacing:.5px;user-select:none'});
-    label.textContent = c.name || c.email.split('@')[0];
+    label.textContent=c.name||c.email.split('@')[0];
 
-    g.append(ring, body, inner, score, label);
+    g.append(ring,body,inner,score,label);
 
-    const onEnter = () => {
+    const onEnter=()=>{
       ring.setAttribute('opacity','1');
       body.setAttribute('filter','url(#glowS)'); body.setAttribute('stroke',rgba(col,.9)); body.setAttribute('stroke-width','1.5');
       label.setAttribute('style',`font-size:11px;fill:${rgba(col)};font-family:var(--mono);letter-spacing:.5px;user-select:none`);
       lineEls[c.email].setAttribute('stroke',rgba(col,.55));
       lineEls[c.email].setAttribute('stroke-width','1.5');
       lineEls[c.email].removeAttribute('stroke-dasharray');
-      showDetail(c, c.totals, col, maxVal);
+      showDetail(c,c.totals,col,maxVal);
     };
-    const onLeave = () => {
+    const onLeave=()=>{
       ring.setAttribute('opacity','0');
       body.setAttribute('filter','url(#glow)'); body.setAttribute('stroke',rgba(col,.4)); body.setAttribute('stroke-width','.8');
       label.setAttribute('style','font-size:9px;fill:var(--dim);font-family:var(--mono);letter-spacing:.5px;user-select:none');
@@ -436,81 +490,67 @@ function buildSVG(contacts) {
       lineEls[c.email].setAttribute('stroke-dasharray','4 7');
       hideDetail();
     };
-    g.addEventListener('mouseenter', onEnter);
-    g.addEventListener('mouseleave', onLeave);
-    nodeGroups[c.email] = g;
-    nodeGrp.append(g);
+    g.addEventListener('mouseenter',onEnter);
+    g.addEventListener('mouseleave',onLeave);
+    nodeGroups[c.email]=g; nodeGrp.append(g);
   });
 
-  // Center node
-  const ct = el('text',{x:cx,y:cy+1,'text-anchor':'middle','dominant-baseline':'middle',
+  // Center
+  const ct=el('text',{x:cx,y:cy+1,'text-anchor':'middle','dominant-baseline':'middle',
     style:'font-size:9px;fill:#6688cc;letter-spacing:1px;font-family:var(--mono)'});
-  ct.textContent = 'YOU';
+  ct.textContent='YOU';
   nodeGrp.append(
     el('circle',{cx,cy,r:28,fill:'url(#cg)',filter:'url(#glow)'}),
     el('circle',{cx,cy,r:22,fill:'#0f1830',stroke:'#3355aa','stroke-width':'1.5'}),
     ct
   );
 
-  // ── Physics loop ───────────────────────────────────────────────────────
-  const nodes = contacts.map(c => ({ id: c.email, score: c.totals.score }));
-  layout = new ForceLayout(nodes, w, h);
-
-  function frame() {
+  // Physics
+  const nodes=contacts.map(c=>({id:c.email,score:c.totals.score}));
+  layout=new ForceLayout(nodes,w,h);
+  function frame(){
     layout.tick();
-    contacts.forEach(c => {
-      const p = layout.pos[c.email];
-      nodeGroups[c.email].setAttribute('transform', `translate(${p.x},${p.y})`);
-      lineEls[c.email].setAttribute('x2', p.x);
-      lineEls[c.email].setAttribute('y2', p.y);
+    contacts.forEach(c=>{
+      const p=layout.pos[c.email];
+      nodeGroups[c.email].setAttribute('transform',`translate(${p.x},${p.y})`);
+      lineEls[c.email].setAttribute('x2',p.x); lineEls[c.email].setAttribute('y2',p.y);
     });
-    rafId = requestAnimationFrame(frame);
+    rafId=requestAnimationFrame(frame);
   }
-  rafId = requestAnimationFrame(frame);
+  rafId=requestAnimationFrame(frame);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Filter + render for the currently selected date window
+// Apply window filter
 // ══════════════════════════════════════════════════════════════════════════════
 
-const MIN_SCORE = 5;
-const TOP_N     = 5;
+const MIN_SCORE=5, TOP_N=5;
 
 function applyWindow() {
-  if (!rawData) return;
-
-  const fromYM = inputFrom.value;  // "YYYY-MM"
-  const toYM   = inputTo.value;
-
-  if (!fromYM || !toYM || fromYM > toYM) {
-    inputFrom.style.borderColor = fromYM > toYM ? 'var(--red)' : '';
-    inputTo.style.borderColor   = fromYM > toYM ? 'var(--red)' : '';
+  if(!rawData)return;
+  const fromYM=inputFrom.value, toYM=inputTo.value;
+  if(!fromYM||!toYM||fromYM>toYM){
+    inputFrom.style.borderColor=fromYM>toYM?'#ff4455':'';
+    inputTo.style.borderColor  =fromYM>toYM?'#ff4455':'';
     return;
   }
-  inputFrom.style.borderColor = '';
-  inputTo.style.borderColor   = '';
+  inputFrom.style.borderColor=''; inputTo.style.borderColor='';
 
-  // Aggregate each contact over the window
-  const scored = rawData.contacts
-    .map(c => ({ ...c, totals: sumMonths(c, fromYM, toYM) }))
-    .filter(c => c.totals.score >= MIN_SCORE)
-    .sort((a,b) => b.totals.score - a.totals.score)
-    .slice(0, TOP_N);
+  const scored=rawData.contacts
+    .map(c=>({...c,totals:sumMonths(c,fromYM,toYM)}))
+    .filter(c=>c.totals.score>=MIN_SCORE)
+    .sort((a,b)=>b.totals.score-a.totals.score)
+    .slice(0,TOP_N);
 
-  // Update pill & footer
-  document.getElementById('window-pill').textContent = `${fromYM} → ${toYM}`;
-  document.getElementById('ft-contacts').textContent  = `CONTACTS: ${scored.length}`;
-  document.getElementById('ft-total').textContent     = `INTERACTIONS: ${scored.reduce((a,c)=>a+c.totals.score,0)}`;
-  document.getElementById('ft-top').textContent       = scored.length
-    ? `TOP: ${scored[0].name || scored[0].email.split('@')[0]}`
-    : 'TOP: —';
-  document.getElementById('ft-window').textContent    = `WINDOW: ${fromYM} → ${toYM}`;
+  document.getElementById('window-pill').textContent=`${fromYM} → ${toYM}`;
+  document.getElementById('ft-contacts').textContent =`CONTACTS: ${scored.length}`;
+  document.getElementById('ft-total').textContent    =`INTERACTIONS: ${scored.reduce((a,c)=>a+c.totals.score,0)}`;
+  document.getElementById('ft-top').textContent      =scored.length?`TOP: ${scored[0].name||scored[0].email.split('@')[0]}`:'TOP: —';
+  document.getElementById('ft-window').textContent   =`WINDOW: ${fromYM} → ${toYM}`;
 
-  if (!scored.length) {
-    cancelAnimationFrame(rafId);
-    svg_.innerHTML = '';
-    notice_.classList.add('visible');
-    return;
+  if(!scored.length){
+    cancelAnimationFrame(rafId); svg_.innerHTML='';
+    notice_.classList.add('visible'); return;
   }
   notice_.classList.remove('visible');
   buildSVG(scored);
@@ -520,13 +560,13 @@ function applyWindow() {
 // Load data
 // ══════════════════════════════════════════════════════════════════════════════
 
-async function loadData() {
-  try {
-    const res = await fetch('email_data.json');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    rawData = await res.json();
-  } catch(e) {
-    overlay_.innerHTML = `
+async function loadData(){
+  try{
+    const res=await fetch('email_data.json');
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    rawData=await res.json();
+  }catch(e){
+    overlay_.innerHTML=`
       <div style="font-size:26px">⚠</div>
       <span style="color:var(--text)">email_data.json not found</span>
       <div class="error-hint">
@@ -536,36 +576,60 @@ async function loadData() {
       </div>`;
     return;
   }
-
-  // Clamp inputs to data range
-  inputFrom.min = rawData.data_from;
-  inputFrom.max = rawData.data_to;
-  inputTo.min   = rawData.data_from;
-  inputTo.max   = rawData.data_to;
-
-  // Default: full range
-  inputFrom.value = rawData.data_from;
-  inputTo.value   = rawData.data_to;
-
+  inputFrom.min=rawData.data_from; inputFrom.max=rawData.data_to;
+  inputTo.min  =rawData.data_from; inputTo.max  =rawData.data_to;
+  inputFrom.value=rawData.data_from; inputTo.value=rawData.data_to;
   overlay_.classList.add('hidden');
   applyWindow();
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Events
+// Color picker wiring
 // ══════════════════════════════════════════════════════════════════════════════
 
-applyBtn.addEventListener('click', applyWindow);
+function wireColorPicker(pickerId, channel) {
+  const picker = document.getElementById(pickerId);
+  // Live preview as user drags (input event fires continuously)
+  picker.addEventListener('input', e => {
+    channelColors[channel] = e.target.value;
+    syncSwatches();
+    applyWindow();   // rebuild viz with new colors instantly
+  });
+  // Also handle change (some browsers only fire change on close)
+  picker.addEventListener('change', e => {
+    channelColors[channel] = e.target.value;
+    syncSwatches();
+    applyWindow();
+  });
+}
 
-// Also apply on Enter in either input
-inputFrom.addEventListener('keydown', e => { if (e.key === 'Enter') applyWindow(); });
-inputTo.addEventListener('keydown',   e => { if (e.key === 'Enter') applyWindow(); });
+wireColorPicker('pick-sent', 'sent');
+wireColorPicker('pick-recv', 'recv');
+wireColorPicker('pick-resp', 'resp');
 
-// Resize
+document.getElementById('reset-colors').addEventListener('click', () => {
+  channelColors.sent = DEFAULTS.sent;
+  channelColors.recv = DEFAULTS.recv;
+  channelColors.resp = DEFAULTS.resp;
+  document.getElementById('pick-sent').value = DEFAULTS.sent;
+  document.getElementById('pick-recv').value = DEFAULTS.recv;
+  document.getElementById('pick-resp').value = DEFAULTS.resp;
+  syncSwatches();
+  applyWindow();
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Other events
+// ══════════════════════════════════════════════════════════════════════════════
+
+document.getElementById('apply-btn').addEventListener('click', applyWindow);
+inputFrom.addEventListener('keydown', e=>{if(e.key==='Enter')applyWindow();});
+inputTo.addEventListener('keydown',   e=>{if(e.key==='Enter')applyWindow();});
+
 let resizeTimer;
-window.addEventListener('resize', () => {
+window.addEventListener('resize',()=>{
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(applyWindow, 200);
+  resizeTimer=setTimeout(applyWindow,200);
 });
 
 loadData();
