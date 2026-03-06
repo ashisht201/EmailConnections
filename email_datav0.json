@@ -1,0 +1,11 @@
+{
+  "me": "you@example.com",
+  "period": { "from": "2024-03-01", "to": "2025-03-01" },
+  "contacts": [
+    { "email": "alice@corp.com",    "name": "Alice Chen",    "sent": 34, "received": 28, "responded": 41 },
+    { "email": "bob@startup.io",    "name": "Bob Mercer",    "sent": 22, "received": 19, "responded": 25 },
+    { "email": "carol@agency.co",   "name": "Carol Voss",    "sent": 18, "received": 31, "responded": 20 },
+    { "email": "kira@finance.com",  "name": "Kira Walsh",    "sent": 20, "received": 14, "responded": 18 },
+    { "email": "henry@partner.biz", "name": "Henry Kim",     "sent": 11, "received": 9,  "responded": 16 }
+  ]
+}
