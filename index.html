@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Email Gravity Map</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@300;500;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #07090f;
+    --surface:  #0d1220;
+    --border:   #1a2035;
+    --muted:    #2a3550;
+    --dim:      #4a5568;
+    --text:     #c8d0e0;
+    --bright:   #e2e8f0;
+    --blue:     #4488ff;
+    --red:      #ff4455;
+    --yellow:   #ffcc00;
+    --mono:     'IBM Plex Mono', monospace;
+    --sans:     'IBM Plex Sans', sans-serif;
+  }
+
+  html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text); font-family: var(--mono); overflow: hidden; }
+
+  /* ── Layout ── */
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  header {
+    flex-shrink: 0;
+    padding: 14px 24px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    flex-wrap: wrap;
+  }
+  .header-left .eyebrow { font-size: 10px; letter-spacing: 4px; color: var(--muted); text-transform: uppercase; margin-bottom: 2px; }
+  .header-left .title   { font-family: var(--sans); font-size: 18px; font-weight: 700; color: var(--bright); letter-spacing: -0.3px; }
+  .header-right { font-size: 11px; color: var(--dim); letter-spacing: 1px; }
+
+  #legend {
+    flex-shrink: 0;
+    padding: 6px 24px;
+    border-bottom: 1px solid #0e1525;
+    display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dim);
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-dot  { width: 7px; height: 7px; border-radius: 50%; }
+  .legend-right { margin-left: auto; color: var(--muted); }
+
+  #canvas-wrap { flex: 1; position: relative; overflow: hidden; }
+  svg { display: block; }
+
+  /* ── Detail panel ── */
+  #detail {
+    position: absolute; top: 14px; right: 14px; width: 220px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px;
+    font-size: 11px; line-height: 1.5;
+    box-shadow: 0 6px 40px rgba(0,0,0,.7);
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s;
+  }
+  #detail.visible { opacity: 1; pointer-events: auto; }
+  .detail-name  { font-family: var(--sans); font-weight: 700; color: var(--bright); font-size: 13px; }
+  .detail-email { color: var(--dim); font-size: 10px; margin-bottom: 12px; }
+  .stat-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .stat-bar-wrap { height: 3px; background: #0e1525; border-radius: 2px; margin-bottom: 8px; }
+  .stat-bar { height: 100%; border-radius: 2px; opacity: .75; }
+  .detail-divider { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+  .score-row { display: flex; justify-content: space-between; }
+  .swatch-row { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+  .swatch { width: 22px; height: 22px; border-radius: 4px; flex-shrink: 0; }
+  .swatch-label { color: var(--dim); font-size: 10px; }
+
+  /* ── Footer ── */
+  footer {
+    flex-shrink: 0;
+    padding: 8px 24px;
+    border-top: 1px solid #0e1525;
+    display: flex; gap: 20px; font-size: 10px; color: var(--muted); letter-spacing: 1px; flex-wrap: wrap;
+  }
+  footer span:last-child { margin-left: auto; }
+
+  /* ── Loading / error states ── */
+  #overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; font-size: 13px; color: var(--dim);
+    background: var(--bg);
+  }
+  #overlay.hidden { display: none; }
+  .spinner {
+    width: 32px; height: 32px; border: 2px solid var(--muted); border-top-color: var(--blue);
+    border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-icon { font-size: 28px; }
+  .error-hint { font-size: 10px; color: var(--muted); max-width: 320px; text-align: center; line-height: 1.7; }
+  code { background: #1a2540; padding: 2px 5px; border-radius: 3px; color: #66aaff; font-family: var(--mono); }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="header-left">
+      <div class="eyebrow">Mailbox Intelligence</div>
+      <div class="title">Communication Gravity Map</div>
+    </div>
+    <div class="header-right" id="period-label">—</div>
+  </header>
+
+  <div id="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Sent to</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Received</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>Responded</div>
+    <div class="legend-right">Size &amp; proximity = interaction intensity</div>
+  </div>
+
+  <div id="canvas-wrap">
+    <div id="overlay">
+      <div class="spinner"></div>
+      <span>Loading email_data.json…</span>
+    </div>
+    <svg id="svg"></svg>
+    <div id="detail">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div id="d-dot" style="width:10px;height:10px;border-radius:50%;flex-shrink:0"></div>
+        <div>
+          <div class="detail-name"  id="d-name"></div>
+          <div class="detail-email" id="d-email"></div>
+        </div>
+      </div>
+      <div id="d-stats"></div>
+      <hr class="detail-divider" />
+      <div class="score-row">
+        <span style="color:var(--dim)">Intensity score</span>
+        <span id="d-score" style="font-weight:600"></span>
+      </div>
+      <div class="swatch-row">
+        <div class="swatch" id="d-swatch"></div>
+        <div class="swatch-label" id="d-rgb"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span id="ft-contacts">CONTACTS —</span>
+    <span id="ft-interactions">INTERACTIONS —</span>
+    <span id="ft-top">TOP CONTACT —</span>
+  </footer>
+</div>
+
+<script>
+// ── Colour ────────────────────────────────────────────────────────────────────
+function computeRGB(sent, received, responded, maxVal) {
+  const norm = v => Math.min(255, Math.round((v / maxVal) * 255));
+  const boost = c => Math.min(255, c + 60);
+  return {
+    r: boost(norm(received)),
+    g: boost(norm(responded)),   // yellow = R+G so responded → green channel
+    b: boost(norm(sent)),
+  };
+}
+const rgba = ({r,g,b}, a=1) => `rgba(${r},${g},${b},${a})`;
+const hex  = ({r,g,b}) => `#${[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('')}`;
+
+// ── Physics ───────────────────────────────────────────────────────────────────
+class ForceLayout {
+  constructor(nodes, w, h) {
+    this.w = w; this.h = h;
+    const maxScore = Math.max(...nodes.map(n => n.score));
+    this.pos = {};
+    this.vel = {};
+    nodes.forEach((n, i) => {
+      const angle = (2 * Math.PI * i) / nodes.length;
+      const frac  = 1 - n.score / maxScore;
+      const dist  = 80 + frac * Math.min(w, h) * 0.32;
+      this.pos[n.id] = { x: w/2 + dist * Math.cos(angle), y: h/2 + dist * Math.sin(angle) };
+      this.vel[n.id] = { x: 0, y: 0 };
+    });
+    this.nodes = nodes;
+    this.iter  = 0;
+    this.MAX   = 400;
+  }
+
+  tick() {
+    if (this.iter++ > this.MAX) return false;
+    const { w, h, pos, vel, nodes } = this;
+    const cx = w/2, cy = h/2;
+    const maxScore = Math.max(...nodes.map(n => n.score));
+    const MARGIN = 64;
+
+    nodes.forEach(n => {
+      const idealDist = 88 + (1 - n.score/maxScore) * Math.min(w,h) * 0.34;
+      const dx = pos[n.id].x - cx, dy = pos[n.id].y - cy;
+      const d  = Math.sqrt(dx*dx + dy*dy) || 1;
+      const f  = (d - idealDist) * 0.045;
+      vel[n.id].x -= dx/d * f;
+      vel[n.id].y -= dy/d * f;
+
+      // repulsion
+      nodes.forEach(o => {
+        if (o.id === n.id) return;
+        const ox = pos[n.id].x - pos[o.id].x;
+        const oy = pos[n.id].y - pos[o.id].y;
+        const od = Math.sqrt(ox*ox + oy*oy) || 1;
+        if (od < 95) {
+          const rep = (95 - od) * 0.055 / od;
+          vel[n.id].x += ox * rep;
+          vel[n.id].y += oy * rep;
+        }
+      });
+
+      vel[n.id].x *= 0.84; vel[n.id].y *= 0.84;
+      pos[n.id].x = Math.max(MARGIN, Math.min(w - MARGIN, pos[n.id].x + vel[n.id].x));
+      pos[n.id].y = Math.max(MARGIN, Math.min(h - MARGIN, pos[n.id].y + vel[n.id].y));
+    });
+    return true;
+  }
+}
+
+// ── SVG helpers ───────────────────────────────────────────────────────────────
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs={}) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+let hovered = null;
+let data    = null;
+let layout  = null;
+let rafId   = null;
+
+const overlay  = document.getElementById('overlay');
+const svgEl_   = document.getElementById('svg');
+const detail   = document.getElementById('detail');
+const wrap     = document.getElementById('canvas-wrap');
+
+function nodeRadius(score, maxScore) { return 18 + (score / maxScore) * 28; }
+
+function showDetail(c, col, maxVal) {
+  document.getElementById('d-dot').style.cssText =
+    `width:10px;height:10px;border-radius:50%;flex-shrink:0;background:${rgba(col)};box-shadow:0 0 8px ${rgba(col,.6)}`;
+  document.getElementById('d-name').textContent  = c.name || c.email.split('@')[0];
+  document.getElementById('d-email').textContent = c.email;
+  document.getElementById('d-score').textContent = c.score;
+  document.getElementById('d-score').style.color = rgba(col);
+  document.getElementById('d-swatch').style.cssText = `width:22px;height:22px;border-radius:4px;background:${rgba(col)};box-shadow:0 0 10px ${rgba(col,.5)}`;
+  document.getElementById('d-rgb').textContent = `rgb(${col.r}, ${col.g}, ${col.b})`;
+
+  const stats = [
+    { label: 'Sent to',   val: c.sent,      color: 'var(--blue)'   },
+    { label: 'Received',  val: c.received,  color: 'var(--red)'    },
+    { label: 'Responded', val: c.responded, color: 'var(--yellow)' },
+  ];
+  document.getElementById('d-stats').innerHTML = stats.map(s => `
+    <div class="stat-row">
+      <span style="color:var(--dim)">${s.label}</span>
+      <span style="color:${s.color}">${s.val}</span>
+    </div>
+    <div class="stat-bar-wrap">
+      <div class="stat-bar" style="width:${Math.round(s.val/maxVal*100)}%;background:${s.color}"></div>
+    </div>`).join('');
+  detail.classList.add('visible');
+}
+
+function hideDetail() { detail.classList.remove('visible'); }
+
+function buildSVG(contacts) {
+  const w = wrap.clientWidth  || 860;
+  const h = wrap.clientHeight || 600;
+  svgEl_.setAttribute('width',  w);
+  svgEl_.setAttribute('height', h);
+  svgEl_.innerHTML = '';
+
+  const maxScore = Math.max(...contacts.map(c => c.score));
+  const maxVal   = Math.max(...contacts.flatMap(c => [c.sent, c.received, c.responded]), 1);
+  const cx = w/2, cy = h/2;
+
+  // ── Defs ──────────────────────────────────────────────────────────────
+  const defs = svgEl('defs');
+
+  // Radial gradients per contact
+  contacts.forEach(c => {
+    const col = computeRGB(c.sent, c.received, c.responded, maxVal);
+    const id  = 'g_' + c.email.replace(/[@.]/g, '_');
+    const rg  = svgEl('radialGradient', { id });
+    const s1  = svgEl('stop', { offset: '0%',   'stop-color': rgba(col,.95) });
+    const s2  = svgEl('stop', { offset: '100%', 'stop-color': rgba(col,.12) });
+    rg.append(s1, s2);
+    defs.append(rg);
+  });
+
+  // Center gradient
+  const cg = svgEl('radialGradient', { id: 'cg' });
+  cg.append(
+    svgEl('stop', { offset: '0%',   'stop-color': '#4466cc', 'stop-opacity': '.6' }),
+    svgEl('stop', { offset: '100%', 'stop-color': '#1a2550', 'stop-opacity': '.1' }),
+  );
+  defs.append(cg);
+
+  // Glow filters
+  function makeFilter(id, sd) {
+    const f = svgEl('filter', { id });
+    const b = svgEl('feGaussianBlur', { stdDeviation: sd, result: 'blur' });
+    const m = svgEl('feMerge');
+    m.append(svgEl('feMergeNode', { in: 'blur' }), svgEl('feMergeNode', { in: 'SourceGraphic' }));
+    f.append(b, m); return f;
+  }
+  defs.append(makeFilter('glow', '3'), makeFilter('glowS', '7'));
+  svgEl_.append(defs);
+
+  // ── Orbital rings ──────────────────────────────────────────────────────
+  [.17, .31, .46].forEach(r => {
+    svgEl_.append(svgEl('circle', {
+      cx, cy, r: Math.min(w,h)*r,
+      fill: 'none', stroke: '#1a2035', 'stroke-width': '.5', 'stroke-dasharray': '3 9',
+    }));
+  });
+
+  // ── Setup layout ───────────────────────────────────────────────────────
+  const nodes = contacts.map(c => ({ id: c.email, score: c.score }));
+  layout = new ForceLayout(nodes, w, h);
+
+  // Groups for lines and node circles (so lines are behind)
+  const lineGroup = svgEl('g', { id: 'lines' });
+  const nodeGroup = svgEl('g', { id: 'nodes' });
+  svgEl_.append(lineGroup, nodeGroup);
+
+  // Pre-create line elements
+  const lineEls = {};
+  contacts.forEach(c => {
+    const col = computeRGB(c.sent, c.received, c.responded, maxVal);
+    const ln = svgEl('line', {
+      x1: cx, y1: cy, x2: cx, y2: cy,
+      stroke: rgba(col, .18),
+      'stroke-width': (c.score / maxScore) * 1.2 + 0.3,
+      'stroke-dasharray': '4 7',
+    });
+    lineEls[c.email] = ln;
+    lineGroup.append(ln);
+  });
+
+  // Pre-create node groups
+  const nodeGroups = {};
+  contacts.forEach(c => {
+    const col  = computeRGB(c.sent, c.received, c.responded, maxVal);
+    const r    = nodeRadius(c.score, maxScore);
+    const id   = 'g_' + c.email.replace(/[@.]/g,'_');
+    const g    = svgEl('g', { style: 'cursor:pointer' });
+
+    const ring = svgEl('circle', { cx:0, cy:0, r: r+9, fill: 'none', stroke: rgba(col,.35), 'stroke-width': '1.8', filter: 'url(#glow)', opacity: '0' });
+    const body = svgEl('circle', { cx:0, cy:0, r, fill:`url(#${id})`, filter:'url(#glow)', stroke: rgba(col,.4), 'stroke-width': '.8' });
+    const inner= svgEl('circle', { cx:0, cy:0, r: r*.55, fill:'#07090f', 'fill-opacity':'.7' });
+    const score= svgEl('text',   { x:0, y:1, 'text-anchor':'middle', 'dominant-baseline':'middle',
+      style:`font-size:${Math.max(8, r*.38)}px;fill:${rgba(col,.9)};font-family:var(--mono);font-weight:600;user-select:none` });
+    score.textContent = c.score;
+    const label= svgEl('text',   { x:0, y: r+14, 'text-anchor':'middle',
+      style:`font-size:9px;fill:var(--dim);font-family:var(--mono);letter-spacing:.5px;user-select:none` });
+    label.textContent = (c.name || c.email.split('@')[0]);
+
+    g.append(ring, body, inner, score, label);
+    g.addEventListener('mouseenter', () => {
+      hovered = c.email;
+      ring.setAttribute('opacity','1');
+      body.setAttribute('filter','url(#glowS)');
+      body.setAttribute('stroke', rgba(col,.9));
+      body.setAttribute('stroke-width','1.5');
+      label.setAttribute('style', `font-size:11px;fill:${rgba(col)};font-family:var(--mono);letter-spacing:.5px;user-select:none`);
+      const ln = lineEls[c.email];
+      ln.setAttribute('stroke', rgba(col,.55));
+      ln.setAttribute('stroke-width', '1.5');
+      ln.removeAttribute('stroke-dasharray');
+      showDetail(c, col, maxVal);
+    });
+    g.addEventListener('mouseleave', () => {
+      hovered = null;
+      ring.setAttribute('opacity','0');
+      body.setAttribute('filter','url(#glow)');
+      body.setAttribute('stroke', rgba(col,.4));
+      body.setAttribute('stroke-width','.8');
+      label.setAttribute('style', `font-size:9px;fill:var(--dim);font-family:var(--mono);letter-spacing:.5px;user-select:none`);
+      const ln = lineEls[c.email];
+      ln.setAttribute('stroke', rgba(col,.18));
+      ln.setAttribute('stroke-width', (c.score/maxScore)*1.2+0.3);
+      ln.setAttribute('stroke-dasharray','4 7');
+      hideDetail();
+    });
+
+    nodeGroups[c.email] = g;
+    nodeGroup.append(g);
+  });
+
+  // Center node
+  nodeGroup.append(
+    svgEl('circle', { cx, cy, r:28, fill:'url(#cg)', filter:'url(#glow)' }),
+    svgEl('circle', { cx, cy, r:22, fill:'#0f1830', stroke:'#3355aa', 'stroke-width':'1.5' }),
+    (() => { const t = svgEl('text',{x:cx,y:cy+1,'text-anchor':'middle','dominant-baseline':'middle',
+      style:'font-size:9px;fill:#6688cc;letter-spacing:1px;font-family:var(--mono)'}); t.textContent='YOU'; return t; })(),
+  );
+
+  // ── Animation loop ─────────────────────────────────────────────────────
+  function frame() {
+    layout.tick();
+    contacts.forEach(c => {
+      const p = layout.pos[c.email];
+      const g = nodeGroups[c.email];
+      g.setAttribute('transform', `translate(${p.x},${p.y})`);
+      const ln = lineEls[c.email];
+      ln.setAttribute('x2', p.x); ln.setAttribute('y2', p.y);
+    });
+    rafId = requestAnimationFrame(frame);
+  }
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(frame);
+}
+
+// ── Load data ─────────────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const res = await fetch('email_data.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    data = await res.json();
+  } catch (e) {
+    overlay.innerHTML = `
+      <div class="error-icon">⚠</div>
+      <span style="color:var(--text)">email_data.json not found</span>
+      <div class="error-hint">
+        Run <code>email_parser.py</code> to generate your data file,
+        then place <code>email_data.json</code> in the same folder as this
+        <code>index.html</code> and push to GitHub.
+      </div>`;
+    return;
+  }
+
+  // Filter + top-N (mirrors parser defaults but re-applies client-side)
+  const MIN = 5, TOP = 5;
+  const contacts = data.contacts
+    .map(c => ({ ...c, score: c.sent + c.received + c.responded }))
+    .filter(c => c.score >= MIN)
+    .sort((a,b) => b.score - a.score)
+    .slice(0, TOP);
+
+  if (!contacts.length) {
+    overlay.innerHTML = `<span>No contacts met the minimum threshold.</span>`;
+    return;
+  }
+
+  // Update header & footer
+  document.getElementById('period-label').textContent =
+    `${data.period.from}  →  ${data.period.to}`;
+  document.getElementById('ft-contacts').textContent =
+    `CONTACTS: ${contacts.length}`;
+  document.getElementById('ft-interactions').textContent =
+    `INTERACTIONS: ${contacts.reduce((a,c)=>a+c.score,0)}`;
+  document.getElementById('ft-top').textContent =
+    `TOP: ${contacts[0].name || contacts[0].email.split('@')[0]}`;
+
+  overlay.classList.add('hidden');
+  buildSVG(contacts);
+}
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (data) buildSVG(
+    data.contacts
+      .map(c=>({...c,score:c.sent+c.received+c.responded}))
+      .filter(c=>c.score>=5).sort((a,b)=>b.score-a.score).slice(0,5)
+  ); }, 200);
+});
+
+loadData();
+</script>
+</body>
+</html>
