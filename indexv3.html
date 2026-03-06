@@ -44,19 +44,7 @@
   }
   .date-range input[type="month"]:focus,
   .date-range input[type="month"]:hover { border-color:#4488ff; }
-  .date-range input[type="number"] {
-    background:var(--surface); border:1px solid var(--muted); border-radius:4px;
-    color:var(--text); font-family:var(--mono); font-size:12px;
-    padding:5px 6px; outline:none; cursor:pointer; transition:border-color .15s;
-    width:52px; text-align:center;
-    -moz-appearance:textfield;
-  }
-  .date-range input[type="number"]::-webkit-inner-spin-button,
-  .date-range input[type="number"]::-webkit-outer-spin-button { opacity:.4; }
-  .date-range input[type="number"]:focus,
-  .date-range input[type="number"]:hover { border-color:#4488ff; }
   .date-range .sep { color:var(--muted); font-size:11px; }
-  .date-range .divider { width:1px; height:20px; background:var(--border); margin:0 4px; }
   #apply-btn {
     background:#4488ff; border:none; border-radius:4px;
     color:#fff; font-family:var(--mono); font-size:11px; letter-spacing:1px;
@@ -172,12 +160,6 @@
       <span class="sep">→</span>
       <label>To</label>
       <input type="month" id="input-to" />
-      <div class="divider"></div>
-      <label>Show</label>
-      <input type="number" id="input-topn" value="5" min="1" max="100" title="Max contacts to show" />
-      <label>Min</label>
-      <input type="number" id="input-min"  value="5" min="1" max="999" title="Min interaction score to include" />
-      <div class="divider"></div>
       <button id="apply-btn">Apply</button>
       <div id="window-pill">—</div>
     </div>
@@ -542,6 +524,8 @@ function buildSVG(contacts) {
 // Apply window filter
 // ══════════════════════════════════════════════════════════════════════════════
 
+const MIN_SCORE=5, TOP_N=5;
+
 function applyWindow() {
   if(!rawData)return;
   const fromYM=inputFrom.value, toYM=inputTo.value;
@@ -551,9 +535,6 @@ function applyWindow() {
     return;
   }
   inputFrom.style.borderColor=''; inputTo.style.borderColor='';
-
-  const TOP_N    = Math.max(1, parseInt(document.getElementById('input-topn').value) || 5);
-  const MIN_SCORE= Math.max(1, parseInt(document.getElementById('input-min').value)  || 1);
 
   const scored=rawData.contacts
     .map(c=>({...c,totals:sumMonths(c,fromYM,toYM)}))
@@ -644,8 +625,6 @@ document.getElementById('reset-colors').addEventListener('click', () => {
 document.getElementById('apply-btn').addEventListener('click', applyWindow);
 inputFrom.addEventListener('keydown', e=>{if(e.key==='Enter')applyWindow();});
 inputTo.addEventListener('keydown',   e=>{if(e.key==='Enter')applyWindow();});
-document.getElementById('input-topn').addEventListener('keydown', e=>{if(e.key==='Enter')applyWindow();});
-document.getElementById('input-min').addEventListener('keydown',  e=>{if(e.key==='Enter')applyWindow();});
 
 let resizeTimer;
 window.addEventListener('resize',()=>{
