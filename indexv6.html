@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="robots" content="noindex,nofollow,noarchive,nosnippet"/>
+<title>Email Gravity Map</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#05070d;--surface:#0b0f1c;--surface2:#0f1628;
+  --border:#1c2440;--muted:#2d3a5c;--dim:#4e607a;
+  --text:#cdd8f0;--bright:#eef2ff;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  --c-sent:#00cfff;--c-recv:#ff3d6e;--c-resp:#ffe033;
+}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:var(--mono);overflow:hidden}
+#app{display:flex;flex-direction:column;height:100vh}
+
+/* ═══════════════════════════════════════════════════
+   PASSWORD GATE
+═══════════════════════════════════════════════════ */
+#gate{
+  position:fixed;inset:0;z-index:9999;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+}
+#gate.hidden{display:none}
+.gate-box{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:36px 40px;
+  display:flex;flex-direction:column;align-items:center;gap:16px;
+  box-shadow:0 20px 80px rgba(0,0,0,.8);
+  min-width:300px;
+}
+.gate-eyebrow{font-size:9px;letter-spacing:4px;color:var(--muted);text-transform:uppercase}
+.gate-title{font-family:var(--sans);font-size:20px;font-weight:700;color:var(--bright);letter-spacing:-.5px}
+.gate-sub{font-size:10px;color:var(--dim);letter-spacing:.5px;margin-top:-6px}
+#gate-input{
+  width:100%;background:var(--surface2);border:1px solid var(--muted);
+  border-radius:6px;color:var(--text);font-family:var(--mono);font-size:14px;
+  padding:10px 14px;outline:none;text-align:center;letter-spacing:3px;
+  transition:border-color .2s;
+}
+#gate-input:focus{border-color:var(--c-sent);box-shadow:0 0 0 2px rgba(0,207,255,.1)}
+#gate-btn{
+  width:100%;background:var(--c-sent);border:none;border-radius:6px;
+  color:#000;font-family:var(--mono);font-size:11px;font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;padding:10px;cursor:pointer;
+  transition:opacity .15s;
+}
+#gate-btn:hover{opacity:.85}
+#gate-err{
+  font-size:10px;color:#ff3d6e;letter-spacing:1px;
+  min-height:14px;text-align:center;
+}
+.gate-hint{font-size:9px;color:var(--muted);text-align:center;line-height:1.7;max-width:260px}
+
+/* ═══════════════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════════════ */
+header{
+  flex-shrink:0;padding:9px 18px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  background:var(--surface);
+}
+.header-titles .eyebrow{font-size:9px;letter-spacing:4px;color:var(--muted);text-transform:uppercase}
+.header-titles .title{font-family:var(--sans);font-size:15px;font-weight:700;color:var(--bright);letter-spacing:-.3px}
+.hdr-controls{display:flex;align-items:center;gap:7px;margin-left:auto;flex-wrap:wrap}
+.hdr-controls label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+input[type="month"],input[type="number"]{
+  background:var(--surface2);border:1px solid var(--muted);border-radius:4px;
+  color:var(--text);font-family:var(--mono);font-size:11px;
+  padding:4px 7px;outline:none;cursor:pointer;transition:border-color .15s;color-scheme:dark;
+}
+input[type="month"]:focus,input[type="month"]:hover,
+input[type="number"]:focus,input[type="number"]:hover{border-color:var(--c-sent)}
+input[type="number"]{width:50px;text-align:center;-moz-appearance:textfield}
+input[type="number"]::-webkit-inner-spin-button{opacity:.4}
+.sep{color:var(--muted);font-size:10px}
+.vdiv{width:1px;height:16px;background:var(--border);margin:0 2px}
+.btn-apply{
+  background:var(--c-sent);border:none;border-radius:4px;
+  color:#000;font-family:var(--mono);font-size:10px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;padding:5px 11px;cursor:pointer;
+  transition:opacity .15s;white-space:nowrap;
+}
+.btn-apply:hover{opacity:.85}
+.nav-link{
+  font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);
+  background:var(--surface2);border:1px solid var(--border);border-radius:4px;
+  padding:5px 9px;text-decoration:none;transition:all .15s;white-space:nowrap;
+}
+.nav-link:hover{border-color:var(--muted);color:var(--text)}
+
+/* ═══════════════════════════════════════════════════
+   CONTROLS BAR (physics + zoom + toggles)
+═══════════════════════════════════════════════════ */
+#ctrl-bar{
+  flex-shrink:0;padding:5px 18px;
+  border-bottom:1px solid #080d18;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:var(--surface);
+}
+.ctrl-group{display:flex;align-items:center;gap:6px}
+.ctrl-label{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+input[type="range"]{
+  -webkit-appearance:none;appearance:none;
+  height:3px;border-radius:2px;
+  background:linear-gradient(to right,var(--c-sent) 0%,var(--c-sent) var(--pct,50%),var(--muted) var(--pct,50%),var(--muted) 100%);
+  outline:none;cursor:pointer;
+}
+input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+  background:var(--bright);border:1px solid var(--c-sent);cursor:pointer;
+}
+input[type="range"]::-moz-range-thumb{
+  width:12px;height:12px;border-radius:50%;
+  background:var(--bright);border:1px solid var(--c-sent);cursor:pointer;
+}
+.ctrl-val{font-size:9px;color:var(--c-sent);min-width:26px;text-align:right;letter-spacing:.5px}
+.toggle-btn{
+  font-size:9px;letter-spacing:1px;text-transform:uppercase;
+  padding:3px 9px;border-radius:3px;border:1px solid var(--muted);
+  background:transparent;color:var(--dim);cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.toggle-btn.on{background:rgba(0,207,255,.08);border-color:var(--c-sent);color:var(--c-sent)}
+.toggle-btn:hover{border-color:var(--text);color:var(--text)}
+.ctrl-sep{width:1px;height:16px;background:var(--border);margin:0 2px}
+
+/* ═══════════════════════════════════════════════════
+   LEGEND BAR
+═══════════════════════════════════════════════════ */
+#legend{
+  flex-shrink:0;padding:4px 18px;border-bottom:1px solid #080d18;
+  display:flex;gap:4px;align-items:center;flex-wrap:wrap;
+  background:var(--surface);
+}
+.ch-item{display:flex;align-items:center;gap:5px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-right:6px}
+.ch-swatch{width:12px;height:12px;border-radius:3px;cursor:pointer;flex-shrink:0;border:1px solid rgba(255,255,255,.15);transition:transform .12s;position:relative}
+.ch-swatch:hover{transform:scale(1.3)}
+.ch-swatch input[type="color"]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:none;padding:0}
+#reset-colors{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);background:none;border:1px solid var(--muted);border-radius:3px;padding:2px 7px;cursor:pointer;transition:all .15s;margin-right:4px}
+#reset-colors:hover{color:var(--text);border-color:var(--dim)}
+.cluster-legend{display:flex;gap:12px;margin-left:auto;align-items:center}
+.cl-item{display:flex;align-items:center;gap:5px;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--dim)}
+.cl-dot{width:8px;height:8px;border-radius:50%}
+
+/* ═══════════════════════════════════════════════════
+   CANVAS
+═══════════════════════════════════════════════════ */
+#canvas-wrap{flex:1;position:relative;overflow:hidden;cursor:grab}
+#canvas-wrap:active{cursor:grabbing}
+svg{display:block;position:absolute;top:0;left:0}
+#zoom-wrap{/* SVG group — panned+zoomed via transform */}
+
+/* ═══════════════════════════════════════════════════
+   DETAIL PANEL
+═══════════════════════════════════════════════════ */
+#detail{
+  position:absolute;top:12px;right:12px;width:228px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:14px;font-size:11px;line-height:1.5;
+  box-shadow:0 8px 48px rgba(0,0,0,.85);
+  opacity:0;pointer-events:none;transition:opacity .2s;z-index:10;
+}
+#detail.visible{opacity:1;pointer-events:auto}
+.d-header{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.d-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.d-name{font-family:var(--sans);font-weight:700;color:var(--bright);font-size:13px}
+.d-email{color:var(--dim);font-size:10px}
+.d-meta{display:flex;gap:5px;margin-bottom:9px;flex-wrap:wrap}
+.d-pill{font-size:9px;padding:2px 7px;border-radius:8px;letter-spacing:.5px}
+.dpi{background:#0a3d2a;color:#10d98a;border:1px solid #0d5c40}
+.dpe{background:#3d2a08;color:#f59e0b;border:1px solid #6b4800}
+.dpn{background:var(--muted);color:var(--dim)}
+.dpt{background:#1a1f3a;color:#7c8fc0;border:1px solid var(--border)}
+.stat-row{display:flex;justify-content:space-between;margin-bottom:2px}
+.bar-wrap{height:3px;background:#0a0f1e;border-radius:2px;margin-bottom:6px}
+.bar-fill{height:100%;border-radius:2px}
+hr.div{border:none;border-top:1px solid var(--border);margin:8px 0}
+.score-row{display:flex;justify-content:space-between}
+.swatch-row{display:flex;align-items:center;gap:7px;margin-top:6px}
+.d-swatch{width:18px;height:18px;border-radius:3px;flex-shrink:0}
+
+/* ═══════════════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════════════ */
+footer{
+  flex-shrink:0;padding:5px 18px;border-top:1px solid #080d18;
+  display:flex;gap:16px;font-size:9px;color:var(--muted);letter-spacing:1px;flex-wrap:wrap;
+  background:var(--surface);align-items:center;
+}
+
+/* ═══════════════════════════════════════════════════
+   OVERLAYS
+═══════════════════════════════════════════════════ */
+#overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-size:13px;color:var(--dim);background:var(--bg)}
+#overlay.hidden{display:none}
+.spinner{width:28px;height:28px;border:2px solid var(--muted);border-top-color:var(--c-sent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-hint{font-size:10px;color:var(--muted);max-width:340px;text-align:center;line-height:1.8}
+code{background:#1a2540;padding:2px 5px;border-radius:3px;color:#66aaff;font-family:var(--mono)}
+#no-data-notice{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--dim);font-size:12px;pointer-events:none}
+#no-data-notice.visible{display:flex}
+</style>
+</head>
+<body>
+<script src="contacts-store.js"></script>
+
+<!-- ═══════════ PASSWORD GATE ═══════════ -->
+<div id="gate">
+  <div class="gate-box">
+    <div class="gate-eyebrow">Mailbox Intelligence</div>
+    <div class="gate-title">Communication Gravity Map</div>
+    <div class="gate-sub">Private — authentication required</div>
+    <input id="gate-input" type="password" placeholder="enter password" autocomplete="current-password"/>
+    <button id="gate-btn">Unlock</button>
+    <div id="gate-err"></div>
+    <div class="gate-hint">This page is private and not indexed by search engines.<br>Contact the owner if you need access.</div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+
+<!-- ═══════════ HEADER ═══════════ -->
+<header>
+  <div class="header-titles">
+    <div class="eyebrow">Mailbox Intelligence</div>
+    <div class="title">Communication Gravity Map</div>
+  </div>
+  <div class="hdr-controls">
+    <label>From</label><input type="month" id="input-from"/>
+    <span class="sep">→</span>
+    <label>To</label><input type="month" id="input-to"/>
+    <div class="vdiv"></div>
+    <label>Show</label><input type="number" id="input-topn" value="20" min="1" max="500"/>
+    <label>Min</label><input type="number" id="input-min"  value="3"  min="1" max="999"/>
+    <div class="vdiv"></div>
+    <button class="btn-apply" id="apply-btn">Apply</button>
+    <a class="nav-link" href="table.html">⊞ Contacts</a>
+    <button class="nav-link" id="btn-lock" title="Lock page" style="border:none;cursor:pointer">⏻ Lock</button>
+  </div>
+</header>
+
+<!-- ═══════════ PHYSICS + ZOOM CONTROLS ═══════════ -->
+<div id="ctrl-bar">
+  <!-- Gravity -->
+  <div class="ctrl-group">
+    <span class="ctrl-label">Gravity</span>
+    <input type="range" id="sl-gravity" min="1" max="20" value="7" step="1" style="width:80px">
+    <span class="ctrl-val" id="v-gravity">7</span>
+  </div>
+  <div class="ctrl-sep"></div>
+  <!-- Repel -->
+  <div class="ctrl-group">
+    <span class="ctrl-label">Repel</span>
+    <input type="range" id="sl-repel" min="1" max="20" value="8" step="1" style="width:80px">
+    <span class="ctrl-val" id="v-repel">8</span>
+  </div>
+  <div class="ctrl-sep"></div>
+  <!-- Zoom -->
+  <div class="ctrl-group">
+    <span class="ctrl-label">Zoom</span>
+    <input type="range" id="sl-zoom" min="20" max="300" value="100" step="5" style="width:90px">
+    <span class="ctrl-val" id="v-zoom">100%</span>
+  </div>
+  <div class="ctrl-sep"></div>
+  <!-- Toggles -->
+  <button class="toggle-btn on"  id="tog-clusters">Clusters On</button>
+  <button class="toggle-btn on"  id="tog-zones">Zones On</button>
+  <button class="toggle-btn on"  id="tog-lines">Lines On</button>
+  <div class="ctrl-sep"></div>
+  <button class="toggle-btn" id="btn-reset-physics" style="border-color:#ff3d6e;color:#ff3d6e">Reset Physics</button>
+</div>
+
+<!-- ═══════════ LEGEND ═══════════ -->
+<div id="legend">
+  <div class="ch-item">
+    <div class="ch-swatch" id="sw-sent"><input type="color" id="pick-sent" value="#00cfff"/></div>Sent
+  </div>
+  <div class="ch-item">
+    <div class="ch-swatch" id="sw-recv"><input type="color" id="pick-recv" value="#ff3d6e"/></div>Received
+  </div>
+  <div class="ch-item">
+    <div class="ch-swatch" id="sw-resp"><input type="color" id="pick-resp" value="#ffe033"/></div>Responded
+  </div>
+  <button id="reset-colors">Reset colors</button>
+  <div class="cluster-legend">
+    <div class="cl-item"><div class="cl-dot" style="background:#10d98a;box-shadow:0 0 5px #10d98a99"></div>Internal</div>
+    <div class="cl-item"><div class="cl-dot" style="background:#f59e0b;box-shadow:0 0 5px #f59e0b99"></div>External</div>
+    <div class="cl-item"><div class="cl-dot" style="background:#4e607a"></div>Unset</div>
+    <span style="color:var(--muted);font-size:9px;letter-spacing:1px;margin-left:8px">SIZE + DISTANCE = INTENSITY</span>
+  </div>
+</div>
+
+<!-- ═══════════ CANVAS ═══════════ -->
+<div id="canvas-wrap">
+  <div id="overlay"><div class="spinner"></div><span>Loading…</span></div>
+  <div id="no-data-notice">
+    <span style="font-size:22px">∅</span>
+    <span>No contacts meet the threshold.</span>
+    <span style="font-size:10px;color:var(--muted)">Lower Min or widen the date range.</span>
+  </div>
+  <svg id="svg">
+    <g id="zoom-wrap"></g>
+  </svg>
+  <div id="detail">
+    <div class="d-header">
+      <div class="d-dot" id="d-dot"></div>
+      <div><div class="d-name" id="d-name"></div><div class="d-email" id="d-email"></div></div>
+    </div>
+    <div class="d-meta" id="d-meta"></div>
+    <div id="d-stats"></div>
+    <hr class="div"/>
+    <div class="score-row"><span style="color:var(--dim)">Intensity</span><span id="d-score" style="font-weight:600"></span></div>
+    <div class="swatch-row"><div class="d-swatch" id="d-swatch"></div><div style="color:var(--dim);font-size:10px" id="d-rgb"></div></div>
+  </div>
+</div>
+
+<!-- ═══════════ FOOTER ═══════════ -->
+<footer>
+  <span id="ft-contacts">CONTACTS —</span>
+  <span id="ft-total">INTERACTIONS —</span>
+  <span id="ft-top">TOP —</span>
+  <span id="ft-window">WINDOW —</span>
+  <span id="ft-clusters" style="margin-left:auto">INT — EXT — UNSET —</span>
+</footer>
+
+</div><!-- /#app -->
+
+<script>
+'use strict';
+// ══════════════════════════════════════════════════════════════════════════════
+// 0 — PASSWORD GATE
+// ══════════════════════════════════════════════════════════════════════════════
+// Password is stored as a SHA-256 hash so the plaintext never ships in the file.
+// To change: run this in any browser console and replace HASH below:
+//   crypto.subtle.digest('SHA-256', new TextEncoder().encode('yourpassword'))
+//     .then(b => console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')))
+//
+// DEFAULT PASSWORD: "gravity"  — change this before publishing!
+const PASS_HASH = 'd4e3fc7b0477747da28f05c27af9f1ab8e70cd60f729a2813f410fd39eb466ac'; // default: "gravity"
+
+const SESSION_KEY = 'egm_auth';
+
+async function sha256(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+
+async function tryUnlock(){
+  const input = document.getElementById('gate-input');
+  const err   = document.getElementById('gate-err');
+  const hash  = await sha256(input.value);
+  if(hash === PASS_HASH){
+    sessionStorage.setItem(SESSION_KEY,'1');
+    document.getElementById('gate').classList.add('hidden');
+    document.getElementById('app').style.display='flex';
+    loadData();
+    err.textContent='';
+  } else {
+    err.textContent='Incorrect password';
+    input.value='';
+    input.focus();
+    input.style.borderColor='#ff3d6e';
+    setTimeout(()=>input.style.borderColor='',800);
+  }
+}
+
+document.getElementById('gate-btn').addEventListener('click', tryUnlock);
+document.getElementById('gate-input').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
+
+// Check existing session
+if(sessionStorage.getItem(SESSION_KEY)==='1'){
+  document.getElementById('gate').classList.add('hidden');
+  document.getElementById('app').style.display='flex';
+}
+
+document.getElementById('btn-lock').addEventListener('click',()=>{
+  sessionStorage.removeItem(SESSION_KEY);
+  document.getElementById('app').style.display='none';
+  document.getElementById('gate').classList.remove('hidden');
+  document.getElementById('gate-input').value='';
+  cancelAnimationFrame(rafId);
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 1 — COLOR SYSTEM
+// ══════════════════════════════════════════════════════════════════════════════
+const DEFAULTS={sent:'#00cfff',recv:'#ff3d6e',resp:'#ffe033'};
+const ch={...DEFAULTS};
+
+function hexToRGB(h){const n=parseInt(h.slice(1),16);return{r:(n>>16)&255,g:(n>>8)&255,b:n&255};}
+
+function computeRGB(sent,received,responded,maxVal){
+  const mx=maxVal||1;
+  const wS=Math.sqrt(sent/mx), wR=Math.sqrt(received/mx), wD=Math.sqrt(responded/mx);
+  const cS=hexToRGB(ch.sent),cR=hexToRGB(ch.recv),cD=hexToRGB(ch.resp);
+  const raw={
+    r:cS.r*wS+cR.r*wR+cD.r*wD,
+    g:cS.g*wS+cR.g*wR+cD.g*wD,
+    b:cS.b*wS+cR.b*wR+cD.b*wD,
+  };
+  const peak=Math.max(raw.r,raw.g,raw.b,1);
+  const sc=255/peak;
+  return{r:Math.min(255,Math.round(raw.r*sc)),g:Math.min(255,Math.round(raw.g*sc)),b:Math.min(255,Math.round(raw.b*sc))};
+}
+const rgba=({r,g,b},a=1)=>`rgba(${r},${g},${b},${a})`;
+
+function syncSwatches(){
+  [['sw-sent','sent'],['sw-recv','recv'],['sw-resp','resp']].forEach(([id,k])=>{
+    const el=document.getElementById(id);
+    el.style.background=ch[k];el.style.color=ch[k];
+  });
+}
+syncSwatches();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 2 — PHYSICS PARAMS (live, read from sliders)
+// ══════════════════════════════════════════════════════════════════════════════
+const PHYSICS_DEFAULTS={gravity:7,repel:8};
+let physParams={...PHYSICS_DEFAULTS};
+
+function readSliders(){
+  physParams.gravity=parseInt(document.getElementById('sl-gravity').value)||7;
+  physParams.repel  =parseInt(document.getElementById('sl-repel').value)||8;
+}
+
+// Slider → label sync + range fill
+function wireSlider(id,labelId,suffix,onChange){
+  const sl=document.getElementById(id);
+  const la=document.getElementById(labelId);
+  function update(){
+    const v=sl.value, mn=sl.min, mx=sl.max;
+    const pct=((v-mn)/(mx-mn)*100).toFixed(1);
+    sl.style.setProperty('--pct',pct+'%');
+    la.textContent=v+(suffix||'');
+    if(onChange)onChange(v);
+  }
+  sl.addEventListener('input',update);
+  update();
+}
+wireSlider('sl-gravity','v-gravity','',()=>{readSliders();restartPhysics();});
+wireSlider('sl-repel','v-repel','',()=>{readSliders();restartPhysics();});
+
+// Zoom slider
+let zoomLevel=1;
+wireSlider('sl-zoom','v-zoom','%', v=>{
+  zoomLevel=parseInt(v)/100;
+  applyZoomTransform();
+});
+
+document.getElementById('btn-reset-physics').addEventListener('click',()=>{
+  document.getElementById('sl-gravity').value=PHYSICS_DEFAULTS.gravity;
+  document.getElementById('sl-repel').value  =PHYSICS_DEFAULTS.repel;
+  document.getElementById('sl-zoom').value   =100;
+  ['sl-gravity','sl-repel','sl-zoom'].forEach(id=>{
+    const e=document.getElementById(id); e.dispatchEvent(new Event('input'));
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 3 — VIEWPORT ZOOM + PAN
+// ══════════════════════════════════════════════════════════════════════════════
+let panX=0,panY=0,isPanning=false,panStartX=0,panStartY=0,panOriginX=0,panOriginY=0;
+
+function applyZoomTransform(){
+  const g=document.getElementById('zoom-wrap');
+  const w=wrap_.clientWidth,h=wrap_.clientHeight;
+  const cx=w/2,cy=h/2;
+  // Zoom around canvas center
+  const tx=cx-zoomLevel*cx+panX;
+  const ty=cy-zoomLevel*cy+panY;
+  g.setAttribute('transform',`translate(${tx},${ty}) scale(${zoomLevel})`);
+  document.getElementById('v-zoom').textContent=Math.round(zoomLevel*100)+'%';
+  document.getElementById('sl-zoom').value=Math.round(zoomLevel*100);
+  const pct=((zoomLevel*100-20)/(300-20)*100).toFixed(1);
+  document.getElementById('sl-zoom').style.setProperty('--pct',pct+'%');
+}
+
+// Mouse wheel zoom
+const wrap_=document.getElementById('canvas-wrap');
+wrap_.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const factor=e.deltaY<0?1.08:0.93;
+  zoomLevel=Math.max(.2,Math.min(3,zoomLevel*factor));
+  applyZoomTransform();
+},{passive:false});
+
+// Mouse drag pan
+wrap_.addEventListener('mousedown',e=>{
+  if(e.button!==0)return;
+  isPanning=true;panStartX=e.clientX;panStartY=e.clientY;
+  panOriginX=panX;panOriginY=panY;
+});
+window.addEventListener('mousemove',e=>{
+  if(!isPanning)return;
+  panX=panOriginX+(e.clientX-panStartX);
+  panY=panOriginY+(e.clientY-panStartY);
+  applyZoomTransform();
+});
+window.addEventListener('mouseup',()=>{isPanning=false;});
+
+// Touch pan/pinch
+let lastTouchDist=null,lastTouchX=null,lastTouchY=null;
+wrap_.addEventListener('touchstart',e=>{
+  if(e.touches.length===1){
+    lastTouchX=e.touches[0].clientX;lastTouchY=e.touches[0].clientY;
+    panOriginX=panX;panOriginY=panY;
+  } else if(e.touches.length===2){
+    lastTouchDist=Math.hypot(
+      e.touches[0].clientX-e.touches[1].clientX,
+      e.touches[0].clientY-e.touches[1].clientY
+    );
+  }
+},{passive:true});
+wrap_.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(e.touches.length===1){
+    panX=panOriginX+(e.touches[0].clientX-lastTouchX);
+    panY=panOriginY+(e.touches[0].clientY-lastTouchY);
+    applyZoomTransform();
+  } else if(e.touches.length===2){
+    const dist=Math.hypot(
+      e.touches[0].clientX-e.touches[1].clientX,
+      e.touches[0].clientY-e.touches[1].clientY
+    );
+    if(lastTouchDist){zoomLevel=Math.max(.2,Math.min(3,zoomLevel*dist/lastTouchDist));}
+    lastTouchDist=dist;
+    applyZoomTransform();
+  }
+},{passive:false});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 4 — TOGGLE STATE
+// ══════════════════════════════════════════════════════════════════════════════
+const toggles={clusters:true,zones:true,lines:true};
+
+function wireToggle(id,key,onLabel,offLabel,cb){
+  const btn=document.getElementById(id);
+  btn.addEventListener('click',()=>{
+    toggles[key]=!toggles[key];
+    btn.classList.toggle('on',toggles[key]);
+    btn.textContent=toggles[key]?onLabel:offLabel;
+    if(cb)cb();
+  });
+}
+wireToggle('tog-clusters','clusters','Clusters On','Clusters Off',applyWindow);
+wireToggle('tog-zones','zones','Zones On','Zones Off',()=>{
+  document.querySelectorAll('.zone-el').forEach(e=>e.style.display=toggles.zones?'':'none');
+});
+wireToggle('tog-lines','lines','Lines On','Lines Off',()=>{
+  document.querySelectorAll('.line-el').forEach(e=>e.style.display=toggles.lines?'':'none');
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 5 — MONTH HELPERS
+// ══════════════════════════════════════════════════════════════════════════════
+function sumMonths(contact,fromYM,toYM){
+  let s=0,r=0,d=0;
+  for(const[m,v]of Object.entries(contact.months||{})){
+    if(m>=fromYM&&m<=toYM){s+=v.sent||0;r+=v.received||0;d+=v.responded||0;}
+  }
+  return{sent:s,received:r,responded:d,score:s+r+d};
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 6 — CLUSTER GEOMETRY
+// ══════════════════════════════════════════════════════════════════════════════
+// Clusters occupy a generous area; anchor positions spread to ~35% of min-dim from center.
+// When clusters are hidden, everything converges to a single center.
+
+function clusterAnchor(cluster,w,h){
+  if(!toggles.clusters) return{x:w/2,y:h/2};
+  const R=Math.min(w,h)*0.30;
+  if(cluster==='internal') return{x:w/2-R*0.90,y:h/2-R*0.50};
+  if(cluster==='external') return{x:w/2+R*0.90,y:h/2-R*0.50};
+  return{x:w/2,y:h/2+R*0.75};
+}
+
+function buildTagAnchors(contacts,w,h){
+  // Group by cluster+tag
+  const clusterTags={internal:{},external:{},unset:{}};
+  contacts.forEach(c=>{
+    const t=c.tag||'__none__';
+    if(!clusterTags[c.cluster][t])clusterTags[c.cluster][t]=[];
+    clusterTags[c.cluster][t].push(c.email);
+  });
+
+  const tagAnchors={};
+  ['internal','external','unset'].forEach(cluster=>{
+    const base=clusterAnchor(cluster,w,h);
+    const tags=Object.keys(clusterTags[cluster]);
+    const spreadR=Math.min(w,h)*0.10;
+    tags.forEach((tag,i)=>{
+      const angle=tags.length>1?(2*Math.PI*i/tags.length)-Math.PI/2:0;
+      const r=tags.length>1?spreadR:0;
+      const anch={x:base.x+r*Math.cos(angle),y:base.y+r*Math.sin(angle)};
+      clusterTags[cluster][tag].forEach(email=>{tagAnchors[email]=anch;});
+    });
+  });
+  return tagAnchors;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 7 — FORCE LAYOUT (gravity + repel with capping)
+// ══════════════════════════════════════════════════════════════════════════════
+// Node radius follows a gravitational analogy:
+//   heavier (higher score) nodes are larger AND pulled closer to their anchor.
+// Repulsion: nodes push away proportional to overlap, capped at MAX_REPEL_DIST
+// so they don't fly to infinity.
+
+function nodeRadius(score,maxScore){
+  return 12+(score/maxScore)*32; // 12..44 px
+}
+
+class ForceLayout{
+  constructor(nodes,w,h){
+    this.w=w;this.h=h;this.iter=0;this.MAX=600;
+    this.pos={};this.vel={};
+    nodes.forEach(n=>{
+      const a=n.tagAnchor||clusterAnchor(n.cluster,w,h);
+      this.pos[n.id]={x:a.x+(Math.random()-.5)*50,y:a.y+(Math.random()-.5)*50};
+      this.vel[n.id]={x:0,y:0};
+    });
+    this.nodes=nodes;
+    this.gravStr=physParams.gravity;
+    this.repStr =physParams.repel;
+  }
+
+  tick(){
+    if(this.iter++>this.MAX)return false;
+    const{w,h,pos,vel,nodes,gravStr,repStr}=this;
+    const MARGIN=48;
+    const maxScore=Math.max(...nodes.map(n=>n.score),1);
+    // Max repulsion distance — prevents infinite expansion
+    const MAX_REPEL_DIST=Math.min(w,h)*0.55;
+
+    nodes.forEach(n=>{
+      const anchor=n.tagAnchor||clusterAnchor(n.cluster,w,h);
+
+      // ── Gravity toward anchor ──────────────────────────────────────────
+      // Heavier nodes have a shorter ideal distance (gravity analogy).
+      // idealDist = baseSpread * (1 - weight) where weight = score/maxScore
+      const weight=n.score/maxScore;
+      const baseSpread=Math.min(w,h)*(0.08+0.22*(1-weight));
+      const idealDist=Math.max(n.r+6, baseSpread*(1-weight*0.6));
+      const dx=pos[n.id].x-anchor.x, dy=pos[n.id].y-anchor.y;
+      const d=Math.sqrt(dx*dx+dy*dy)||1;
+      const gravF=(d-idealDist)*(gravStr*0.005);
+      vel[n.id].x-=dx/d*gravF;
+      vel[n.id].y-=dy/d*gravF;
+
+      // ── Repulsion from other nodes ────────────────────────────────────
+      nodes.forEach(o=>{
+        if(o.id===n.id)return;
+        const ox=pos[n.id].x-pos[o.id].x, oy=pos[n.id].y-pos[o.id].y;
+        const od=Math.sqrt(ox*ox+oy*oy)||1;
+        // Min separation = sum of radii + padding
+        const minSep=n.r+o.r+10;
+        // Repulsion acts within MAX_REPEL_DIST and is strongest at contact
+        if(od<MAX_REPEL_DIST){
+          // Inverse-square softened repulsion — weakens with distance
+          const repF=(repStr*0.012)*minSep*minSep/(od*od+1);
+          // Cap so we don't blow nodes to infinity
+          const cap=3.5;
+          const fx=Math.max(-cap,Math.min(cap,ox/od*repF));
+          const fy=Math.max(-cap,Math.min(cap,oy/od*repF));
+          vel[n.id].x+=fx;vel[n.id].y+=fy;
+        }
+      });
+
+      // ── Damping ───────────────────────────────────────────────────────
+      vel[n.id].x*=0.80;vel[n.id].y*=0.80;
+      // Clamp velocity to avoid explosions
+      const speed=Math.sqrt(vel[n.id].x**2+vel[n.id].y**2);
+      if(speed>8){const s=8/speed;vel[n.id].x*=s;vel[n.id].y*=s;}
+
+      pos[n.id].x=Math.max(MARGIN,Math.min(w-MARGIN,pos[n.id].x+vel[n.id].x));
+      pos[n.id].y=Math.max(MARGIN,Math.min(h-MARGIN,pos[n.id].y+vel[n.id].y));
+    });
+    return true;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 8 — STATE
+// ══════════════════════════════════════════════════════════════════════════════
+let rawData=null,rafId=null,layout=null,currentContacts=null;
+const svg_el=document.getElementById('svg');
+const overlay_=document.getElementById('overlay');
+const detail_=document.getElementById('detail');
+const notice_=document.getElementById('no-data-notice');
+const inputFrom=document.getElementById('input-from');
+const inputTo=document.getElementById('input-to');
+
+function restartPhysics(){
+  if(!currentContacts)return;
+  readSliders();
+  buildSVG(currentContacts);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 9 — DETAIL PANEL
+// ══════════════════════════════════════════════════════════════════════════════
+function showDetail(c,totals,col,maxVal){
+  const{sent,received,responded,score}=totals;
+  document.getElementById('d-dot').style.cssText=`width:10px;height:10px;border-radius:50%;flex-shrink:0;background:${rgba(col)};box-shadow:0 0 10px ${rgba(col,.7)}`;
+  document.getElementById('d-name').textContent=c.name||c.email.split('@')[0];
+  document.getElementById('d-email').textContent=c.email;
+  document.getElementById('d-score').textContent=score;
+  document.getElementById('d-score').style.color=rgba(col);
+  document.getElementById('d-swatch').style.cssText=`background:${rgba(col)};box-shadow:0 0 12px ${rgba(col,.6)}`;
+  document.getElementById('d-rgb').textContent=`rgb(${col.r},${col.g},${col.b})`;
+
+  const meta=ContactStore.get(c.email);
+  const catCls=meta.category==='internal'?'dpi':meta.category==='external'?'dpe':'dpn';
+  const catLabel=meta.category==='internal'?'Internal':meta.category==='external'?'External':'Unset';
+  let mh=`<span class="d-pill ${catCls}">${catLabel}</span>`;
+  if(meta.tag)mh+=`<span class="d-pill dpt">#${meta.tag}</span>`;
+  document.getElementById('d-meta').innerHTML=mh;
+
+  document.getElementById('d-stats').innerHTML=[
+    {l:'Sent to',v:sent,c:ch.sent},
+    {l:'Received',v:received,c:ch.recv},
+    {l:'Responded',v:responded,c:ch.resp},
+  ].map(s=>`
+    <div class="stat-row"><span style="color:var(--dim)">${s.l}</span><span style="color:${s.c};font-weight:600">${s.v}</span></div>
+    <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(s.v/(maxVal||1)*100)}%;background:${s.c}"></div></div>
+  `).join('');
+  detail_.classList.add('visible');
+}
+function hideDetail(){detail_.classList.remove('visible');}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 10 — SVG HELPERS
+// ══════════════════════════════════════════════════════════════════════════════
+const NS='http://www.w3.org/2000/svg';
+const svgEl=(t,a={})=>{const e=document.createElementNS(NS,t);for(const[k,v]of Object.entries(a))e.setAttribute(k,v);return e;};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 11 — BUILD SVG
+// ══════════════════════════════════════════════════════════════════════════════
+function buildSVG(contacts){
+  cancelAnimationFrame(rafId);
+  currentContacts=contacts;
+
+  const zw=document.getElementById('zoom-wrap');
+  // Clear only zoom-wrap children
+  while(zw.firstChild)zw.removeChild(zw.firstChild);
+
+  const w=wrap_.clientWidth||900, h=wrap_.clientHeight||560;
+  svg_el.setAttribute('width',w);svg_el.setAttribute('height',h);
+
+  const maxScore=Math.max(...contacts.map(c=>c.totals.score),1);
+  const maxVal  =Math.max(...contacts.flatMap(c=>[c.totals.sent,c.totals.received,c.totals.responded]),1);
+
+  const metaMap=ContactStore.load();
+  contacts.forEach(c=>{
+    const m=metaMap[c.email]||{};
+    c.cluster=m.category||'unset';
+    c.tag=m.tag||'';
+  });
+
+  const tagAnchors=buildTagAnchors(contacts,w,h);
+
+  // ── Defs (inside zoom-wrap via foreignObject trick — use svg defs) ────────
+  // Put defs directly on svg_el so gradients work at all zoom levels
+  let defs=svg_el.querySelector('defs');
+  if(!defs){defs=svgEl('defs');svg_el.insertBefore(defs,svg_el.firstChild);}
+  // Clear old gradient defs
+  defs.innerHTML='';
+
+  contacts.forEach(c=>{
+    const col=computeRGB(c.totals.sent,c.totals.received,c.totals.responded,maxVal);
+    const id='g_'+c.email.replace(/[@.]/g,'_');
+    const rg=svgEl('radialGradient',{id,gradientUnits:'userSpaceOnUse',
+      cx:'0',cy:'0',r:String(nodeRadius(c.totals.score,maxScore)*1.2)});
+    rg.append(svgEl('stop',{offset:'0%','stop-color':rgba(col,.95)}),
+              svgEl('stop',{offset:'100%','stop-color':rgba(col,.05)}));
+    defs.append(rg);
+  });
+
+  function mkFilter(id,sd){
+    const f=svgEl('filter',{id,'color-interpolation-filters':'sRGB',x:'-50%',y:'-50%',width:'200%',height:'200%'});
+    f.append(svgEl('feGaussianBlur',{stdDeviation:sd,result:'blur'}));
+    const m=svgEl('feMerge');
+    m.append(svgEl('feMergeNode',{in:'blur'}),svgEl('feMergeNode',{in:'SourceGraphic'}));
+    f.append(m);return f;
+  }
+  defs.append(mkFilter('glow','3.5'),mkFilter('glowS','8'));
+
+  // ── Background grid ────────────────────────────────────────────────────────
+  const grid=svgEl('g',{opacity:'.1'});
+  for(let x=0;x<w;x+=40)for(let y=0;y<h;y+=40)
+    grid.append(svgEl('circle',{cx:x,cy:y,r:'1',fill:'#3a4a6a'}));
+  zw.append(grid);
+
+  // ── Cluster zones ──────────────────────────────────────────────────────────
+  const zoneG=svgEl('g',{class:'zone-group'});
+  if(toggles.clusters){
+    [
+      {cl:'internal',color:'#10d98a',label:'INTERNAL'},
+      {cl:'external',color:'#f59e0b',label:'EXTERNAL'},
+      {cl:'unset',   color:'#4e607a',label:'UNSET'},
+    ].forEach(({cl,color,label})=>{
+      const a=clusterAnchor(cl,w,h);
+
+      // Zone radius scales with how many nodes are in this cluster
+      const clusterNodes=contacts.filter(c=>c.cluster===cl);
+      const density=Math.max(1,clusterNodes.length);
+      // Base zone R = 18% of shorter dim, grows with sqrt(density)
+      const zoneR=Math.min(w,h)*(0.14+0.04*Math.sqrt(density));
+
+      const fill=svgEl('circle',{cx:a.x,cy:a.y,r:zoneR,fill:color,opacity:'.04',class:'zone-el'});
+      const ring=svgEl('circle',{cx:a.x,cy:a.y,r:zoneR,fill:'none',stroke:color,
+        'stroke-width':'1','stroke-dasharray':'5 8',opacity:'.22',class:'zone-el'});
+      const txt=svgEl('text',{x:a.x,y:a.y-zoneR-7,'text-anchor':'middle',class:'zone-el',
+        style:`font-size:9px;fill:${color};letter-spacing:3px;font-family:var(--mono);opacity:.45`});
+      txt.textContent=label;
+      zoneG.append(fill,ring,txt);
+    });
+  }
+  zw.append(zoneG);
+
+  // ── Lines ──────────────────────────────────────────────────────────────────
+  const lineGrp=svgEl('g');
+  const lineEls={};
+  contacts.forEach(c=>{
+    const col=computeRGB(c.totals.sent,c.totals.received,c.totals.responded,maxVal);
+    const anchor=clusterAnchor(c.cluster,w,h);
+    const lw=(c.totals.score/maxScore)*1.8+0.4;
+    const ln=svgEl('line',{x1:anchor.x,y1:anchor.y,x2:anchor.x,y2:anchor.y,
+      stroke:rgba(col,.25),'stroke-width':lw,'stroke-dasharray':'3 7',class:'line-el'});
+    if(!toggles.lines)ln.style.display='none';
+    lineEls[c.email]=ln;lineGrp.append(ln);
+  });
+  zw.append(lineGrp);
+
+  // ── Nodes ──────────────────────────────────────────────────────────────────
+  const nodeGrp=svgEl('g');
+  const nodeGroups={};
+
+  contacts.forEach(c=>{
+    const col=computeRGB(c.totals.sent,c.totals.received,c.totals.responded,maxVal);
+    const r=nodeRadius(c.totals.score,maxScore);
+    const gid='g_'+c.email.replace(/[@.]/g,'_');
+    const g=svgEl('g',{style:'cursor:pointer'});
+
+    // Pulse ring (always visible, subtle)
+    const pulse=svgEl('circle',{cx:0,cy:0,r:r+5,fill:'none',
+      stroke:rgba(col,.18),'stroke-width':'1.5',filter:'url(#glow)'});
+    // Hover ring
+    const ring=svgEl('circle',{cx:0,cy:0,r:r+11,fill:'none',
+      stroke:rgba(col,.55),'stroke-width':'2',filter:'url(#glow)',opacity:'0'});
+    // Body
+    const body=svgEl('circle',{cx:0,cy:0,r,
+      fill:`url(#${gid})`,filter:'url(#glow)',
+      stroke:rgba(col,.8),'stroke-width':'1.3'});
+    // Dark center
+    const inner=svgEl('circle',{cx:0,cy:0,r:r*.50,fill:'#05070d','fill-opacity':'.78'});
+    // Score
+    const scoreEl=svgEl('text',{x:0,y:1,'text-anchor':'middle','dominant-baseline':'middle',
+      style:`font-size:${Math.max(8,r*.44)}px;fill:${rgba(col,1)};font-family:var(--mono);font-weight:600;user-select:none`});
+    scoreEl.textContent=c.totals.score;
+    // Name
+    const label=svgEl('text',{x:0,y:r+13,'text-anchor':'middle',
+      style:'font-size:9px;fill:var(--dim);font-family:var(--mono);letter-spacing:.3px;user-select:none'});
+    label.textContent=c.name||c.email.split('@')[0];
+    // Tag
+    const meta=metaMap[c.email]||{};
+    const tagEl=svgEl('text',{x:0,y:r+23,'text-anchor':'middle',
+      style:'font-size:8px;fill:var(--muted);font-family:var(--mono);user-select:none;font-style:italic'});
+    if(meta.tag)tagEl.textContent=`#${meta.tag}`;
+
+    g.append(pulse,ring,body,inner,scoreEl,label,tagEl);
+
+    const onEnter=()=>{
+      ring.setAttribute('opacity','1');
+      body.setAttribute('filter','url(#glowS)');
+      body.setAttribute('stroke',rgba(col,1));body.setAttribute('stroke-width','2');
+      label.setAttribute('style',`font-size:10px;fill:${rgba(col)};font-family:var(--mono);font-weight:600;user-select:none`);
+      lineEls[c.email].setAttribute('stroke',rgba(col,.65));
+      lineEls[c.email].setAttribute('stroke-width','2.5');
+      lineEls[c.email].removeAttribute('stroke-dasharray');
+      showDetail(c,c.totals,col,maxVal);
+    };
+    const onLeave=()=>{
+      ring.setAttribute('opacity','0');
+      body.setAttribute('filter','url(#glow)');
+      body.setAttribute('stroke',rgba(col,.8));body.setAttribute('stroke-width','1.3');
+      label.setAttribute('style','font-size:9px;fill:var(--dim);font-family:var(--mono);letter-spacing:.3px;user-select:none');
+      lineEls[c.email].setAttribute('stroke',rgba(col,.25));
+      lineEls[c.email].setAttribute('stroke-width',(c.totals.score/maxScore)*1.8+0.4);
+      lineEls[c.email].setAttribute('stroke-dasharray','3 7');
+      hideDetail();
+    };
+    g.addEventListener('mouseenter',onEnter);
+    g.addEventListener('mouseleave',onLeave);
+    nodeGroups[c.email]=g;nodeGrp.append(g);
+  });
+
+  // ── Cluster anchor markers ─────────────────────────────────────────────────
+  if(toggles.clusters){
+    [{cl:'internal',c:'#10d98a'},{cl:'external',c:'#f59e0b'},{cl:'unset',c:'#4e607a'}].forEach(({cl,c})=>{
+      const a=clusterAnchor(cl,w,h);
+      nodeGrp.append(
+        svgEl('circle',{cx:a.x,cy:a.y,r:9,fill:c,opacity:'.18',filter:'url(#glow)'}),
+        svgEl('circle',{cx:a.x,cy:a.y,r:4,fill:c,opacity:'.7'}),
+      );
+    });
+  }
+
+  zw.append(nodeGrp);
+
+  // ── Physics ────────────────────────────────────────────────────────────────
+  readSliders();
+  const nodes=contacts.map(c=>({
+    id:c.email,score:c.totals.score,cluster:c.cluster,tag:c.tag,
+    r:nodeRadius(c.totals.score,maxScore),
+    tagAnchor:tagAnchors[c.email],
+  }));
+  layout=new ForceLayout(nodes,w,h);
+
+  function frame(){
+    layout.tick();
+    contacts.forEach(c=>{
+      const p=layout.pos[c.email];
+      nodeGroups[c.email].setAttribute('transform',`translate(${p.x},${p.y})`);
+      lineEls[c.email].setAttribute('x2',p.x);lineEls[c.email].setAttribute('y2',p.y);
+    });
+    rafId=requestAnimationFrame(frame);
+  }
+  rafId=requestAnimationFrame(frame);
+
+  applyZoomTransform();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 12 — APPLY WINDOW
+// ══════════════════════════════════════════════════════════════════════════════
+function applyWindow(){
+  if(!rawData)return;
+  const fromYM=inputFrom.value, toYM=inputTo.value;
+  if(!fromYM||!toYM||fromYM>toYM){
+    inputFrom.style.borderColor=fromYM>toYM?'#ff3d6e':'';
+    inputTo.style.borderColor  =fromYM>toYM?'#ff3d6e':'';
+    return;
+  }
+  inputFrom.style.borderColor='';inputTo.style.borderColor='';
+
+  const TOP_N=Math.max(1,parseInt(document.getElementById('input-topn').value)||20);
+  const MIN_S=Math.max(1,parseInt(document.getElementById('input-min').value)||1);
+
+  const metaMap=ContactStore.load();
+  const scored=rawData.contacts
+    .map(c=>({...c,totals:sumMonths(c,fromYM,toYM)}))
+    .filter(c=>c.totals.score>=MIN_S)
+    .sort((a,b)=>b.totals.score-a.totals.score)
+    .slice(0,TOP_N);
+
+  document.getElementById('ft-contacts').textContent=`CONTACTS: ${scored.length}`;
+  document.getElementById('ft-total').textContent   =`INTERACTIONS: ${scored.reduce((a,c)=>a+c.totals.score,0)}`;
+  document.getElementById('ft-top').textContent     =scored.length?`TOP: ${scored[0].name||scored[0].email.split('@')[0]}`:'TOP: —';
+  document.getElementById('ft-window').textContent  =`${fromYM} → ${toYM}`;
+
+  const iC=scored.filter(c=>(metaMap[c.email]||{}).category==='internal').length;
+  const eC=scored.filter(c=>(metaMap[c.email]||{}).category==='external').length;
+  document.getElementById('ft-clusters').textContent=`INT:${iC} EXT:${eC} UNSET:${scored.length-iC-eC}`;
+
+  if(!scored.length){
+    cancelAnimationFrame(rafId);
+    const zw=document.getElementById('zoom-wrap');while(zw.firstChild)zw.removeChild(zw.firstChild);
+    notice_.classList.add('visible');return;
+  }
+  notice_.classList.remove('visible');
+  buildSVG(scored);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 13 — LOAD DATA
+// ══════════════════════════════════════════════════════════════════════════════
+async function loadData(){
+  try{
+    const res=await fetch('email_data.json');
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    rawData=await res.json();
+  }catch(e){
+    overlay_.innerHTML=`<div style="font-size:26px">⚠</div>
+      <span style="color:var(--bright)">email_data.json not found</span>
+      <div class="error-hint">Place <code>email_data.json</code> in the same folder and push to GitHub.</div>`;
+    return;
+  }
+  inputFrom.min=rawData.data_from;inputFrom.max=rawData.data_to;
+  inputTo.min  =rawData.data_from;inputTo.max  =rawData.data_to;
+  inputFrom.value=rawData.data_from;inputTo.value=rawData.data_to;
+  overlay_.classList.add('hidden');
+  applyWindow();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 14 — COLOR PICKERS
+// ══════════════════════════════════════════════════════════════════════════════
+function wirePicker(id,key){
+  const p=document.getElementById(id);
+  const go=e=>{ch[key]=e.target.value;syncSwatches();applyWindow();};
+  p.addEventListener('input',go);p.addEventListener('change',go);
+}
+wirePicker('pick-sent','sent');wirePicker('pick-recv','recv');wirePicker('pick-resp','resp');
+document.getElementById('reset-colors').addEventListener('click',()=>{
+  Object.assign(ch,DEFAULTS);
+  document.getElementById('pick-sent').value=DEFAULTS.sent;
+  document.getElementById('pick-recv').value=DEFAULTS.recv;
+  document.getElementById('pick-resp').value=DEFAULTS.resp;
+  syncSwatches();applyWindow();
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 15 — EVENTS
+// ══════════════════════════════════════════════════════════════════════════════
+document.getElementById('apply-btn').addEventListener('click',applyWindow);
+[inputFrom,inputTo,
+ document.getElementById('input-topn'),
+ document.getElementById('input-min')]
+.forEach(e=>e.addEventListener('keydown',ev=>{if(ev.key==='Enter')applyWindow();}));
+
+window.addEventListener('focus',()=>{if(rawData)applyWindow();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&rawData)applyWindow();});
+
+let rt;
+window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{applyWindow();applyZoomTransform();},200);});
+
+// Boot (only if already authenticated)
+if(sessionStorage.getItem(SESSION_KEY)==='1') loadData();
+</script>
+</body>
+</html>
