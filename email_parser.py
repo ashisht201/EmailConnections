@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """
-email_parser.py  —  Offline Email Communication Analyzer
-=========================================================
+email_parser.py  —  Offline Email Communication Analyzer (monthly buckets)
+===========================================================================
 Reads a local email dump (mbox or folder of .eml files) and outputs
 email_data.json for the starburst visualization.
+
+The JSON now stores per-month counts for every contact, so the
+visualization can filter to any date range without re-running this script.
+
+Run this ONCE against your full dump. The viz handles all time filtering.
 
 No credentials. No network connection. Runs entirely offline.
 
@@ -22,8 +27,7 @@ GMAIL  (produces .mbox files)
     python email_parser.py \\
       --me    you@gmail.com \\
       --inbox "Takeout/Mail/All mail Including Spam and Trash.mbox" \\
-      --sent  "Takeout/Mail/Sent.mbox" \\
-      --from  2024-03-01 --to 2025-03-01
+      --sent  "Takeout/Mail/Sent.mbox"
 
 OUTLOOK / OFFICE 365
   Option A — export via Thunderbird + ImportExportTools NG add-on:
@@ -36,11 +40,10 @@ APPLE MAIL
     python email_parser.py \\
       --me    you@icloud.com \\
       --inbox ~/Desktop/Inbox.mbox \\
-      --sent  ~/Desktop/Sent.mbox \\
-      --from  2024-03-01 --to 2025-03-01
+      --sent  ~/Desktop/Sent.mbox
 
 THUNDERBIRD
-  Inbox/Sent are plain mbox files already — no export step needed.
+  Inbox/Sent folders are plain mbox files — no export step needed.
   Linux:   ~/.thunderbird/<profile>/Mail/Local Folders/
   macOS:   ~/Library/Thunderbird/Profiles/<profile>/Mail/
   Windows: %APPDATA%\\Thunderbird\\Profiles\\<profile>\\Mail\\
@@ -48,37 +51,60 @@ THUNDERBIRD
 ──────────────────────────────────────────────────────────────────────
 USAGE
 ──────────────────────────────────────────────────────────────────────
+  # Scan everything (recommended — run once, filter in the viz)
   python email_parser.py \\
     --me    you@example.com \\
     --inbox path/to/inbox.mbox \\
-    --sent  path/to/sent.mbox \\
-    --from  2024-03-01 \\
-    --to    2025-03-01 \\
+    --sent  path/to/sent.mbox  \\
     --out   email_data.json
+
+  # Optionally narrow the scan window to save time on huge mailboxes
+  python email_parser.py \\
+    --me    you@example.com \\
+    --inbox path/to/inbox.mbox \\
+    --sent  path/to/sent.mbox  \\
+    --from  2023-01-01 --to 2025-12-31
 
   # EML folder instead of mbox:
   python email_parser.py \\
     --me    you@example.com \\
     --inbox path/to/inbox_eml_folder/ \\
-    --sent  path/to/sent_eml_folder/ \\
-    --from  2024-03-01 --to 2025-03-01
-
-  # Inbox only (no separate sent folder):
-  python email_parser.py \\
-    --me    you@example.com \\
-    --inbox path/to/all_mail.mbox \\
-    --from  2024-03-01 --to 2025-03-01
+    --sent  path/to/sent_eml_folder/
 
 FLAGS
   --me          Your email address (required)
-  --inbox       Inbox mbox file or folder of .eml files
-  --sent        Sent  mbox file or folder of .eml files (optional)
-  --from        Start date inclusive, YYYY-MM-DD
-  --to          End date   inclusive, YYYY-MM-DD
+  --inbox       Inbox mbox file or .eml folder
+  --sent        Sent  mbox file or .eml folder (optional)
+  --from        Optional earliest date to scan, YYYY-MM-DD
+  --to          Optional latest   date to scan, YYYY-MM-DD
   --out         Output JSON path (default: email_data.json)
-  --min-count   Min total interactions to include a contact (default: 5)
-  --top-n       Max contacts in output (default: 5)
+  --min-count   Min total interactions across ALL time to include a
+                contact at all (default: 3 — the viz applies its own
+                per-window threshold of 5)
   --verbose     Print per-message debug info
+
+OUTPUT FORMAT (email_data.json)
+──────────────────────────────────────────────────────────────────────
+{
+  "me": "you@example.com",
+  "data_from": "2024-01",          ← earliest month present
+  "data_to":   "2025-03",          ← latest  month present
+  "contacts": [
+    {
+      "email": "alice@example.com",
+      "name":  "Alice Example",
+      "months": {
+        "2024-01": { "sent": 2, "received": 3, "responded": 1 },
+        "2024-02": { "sent": 0, "received": 1, "responded": 0 },
+        ...
+      }
+    },
+    ...
+  ]
+}
+
+The viz sums whichever months fall inside the chosen date range,
+then applies the top-5 / min-5 rules on the resulting totals.
 """
 
 import mailbox
@@ -98,17 +124,17 @@ from pathlib import Path
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="Parse local email dump → email_data.json",
+        description="Parse local email dump → email_data.json (monthly buckets)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("--me",        required=True,  help="Your email address")
     p.add_argument("--inbox",     default=None,   help="Inbox mbox file or .eml folder")
     p.add_argument("--sent",      default=None,   help="Sent  mbox file or .eml folder (optional)")
-    p.add_argument("--from",      dest="date_from", required=True, help="Start date YYYY-MM-DD")
-    p.add_argument("--to",        dest="date_to",   required=True, help="End date   YYYY-MM-DD")
+    p.add_argument("--from",      dest="date_from", default=None, help="Scan start date YYYY-MM-DD (optional)")
+    p.add_argument("--to",        dest="date_to",   default=None, help="Scan end   date YYYY-MM-DD (optional)")
     p.add_argument("--out",       default="email_data.json")
-    p.add_argument("--min-count", type=int, default=5)
-    p.add_argument("--top-n",     type=int, default=5)
+    p.add_argument("--min-count", type=int, default=3,
+                   help="Min lifetime interactions to include a contact (default: 3)")
     p.add_argument("--verbose",   action="store_true")
     return p.parse_args()
 
@@ -157,6 +183,11 @@ def derive_name(addr: str) -> str:
     return " ".join(w.capitalize() for w in re.split(r"[._\-+]", local))
 
 
+def ym(dt: datetime) -> str:
+    """Return 'YYYY-MM' string for a datetime."""
+    return dt.strftime("%Y-%m")
+
+
 # ── Message loaders ───────────────────────────────────────────────────────────
 
 def load_mbox(path: str):
@@ -194,24 +225,34 @@ def load_source(path: str):
 # ── Core analysis ─────────────────────────────────────────────────────────────
 
 def analyze(args):
-    since    = datetime.strptime(args.date_from, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-    before   = datetime.strptime(args.date_to,   "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    since  = datetime.strptime(args.date_from, "%Y-%m-%d").replace(tzinfo=timezone.utc) if args.date_from else None
+    before = datetime.strptime(args.date_to,   "%Y-%m-%d").replace(tzinfo=timezone.utc) if args.date_to   else None
     my_email = args.me.lower()
 
-    threads_received = defaultdict(set)   # contact → set of thread_keys
-    threads_sent     = defaultdict(set)
-    names            = {}                 # email → display name
+    # contact → month → { sent_threads, received_threads }
+    # We track sets of thread_keys per month so we can compute responded
+    # (intersection of sent & received) correctly within each month.
+    sent_by_month     = defaultdict(lambda: defaultdict(set))  # [contact][month] = set of thread_keys
+    received_by_month = defaultdict(lambda: defaultdict(set))
+    names             = {}
+    all_months        = set()
 
     def process(msg, label):
         dt = parse_date(msg)
-        if dt is None or not (since <= dt <= before):
+        if dt is None:
             return
+        if since  and dt < since:
+            return
+        if before and dt > before:
+            return
+
+        month = ym(dt)
+        all_months.add(month)
 
         from_name, from_addr = extract_address(msg.get("From", ""))
         to_header = msg.get("To", "")
         subject   = normalize_subject(msg.get("Subject", ""))
 
-        # Direct To only — split on comma, skip CC/BCC entirely
         to_pairs = [parseaddr(a.strip()) for a in to_header.split(",") if a.strip()]
         to_addrs = [(n.strip(), a.strip().lower()) for n, a in to_pairs]
 
@@ -225,16 +266,16 @@ def analyze(args):
             for rec_name, rec_addr in to_addrs:
                 if not rec_addr or rec_addr == my_email:
                     continue
-                threads_sent[rec_addr].add(f"{rec_addr}::{subject}")
+                sent_by_month[rec_addr][month].add(f"{rec_addr}::{subject}")
                 if rec_name and rec_addr not in names:
                     names[rec_addr] = rec_name
 
         elif i_am_direct_to and from_addr and from_addr != my_email:
-            threads_received[from_addr].add(f"{from_addr}::{subject}")
+            received_by_month[from_addr][month].add(f"{from_addr}::{subject}")
             if from_name:
                 names[from_addr] = from_name
 
-    # ── Scan inbox ─────────────────────────────────────────────────────────
+    # ── Scan ──────────────────────────────────────────────────────────────
     if args.inbox:
         print(f"📥 Inbox:  {args.inbox}")
         n = 0
@@ -247,7 +288,6 @@ def analyze(args):
     else:
         print("ℹ  No --inbox given; only sent mail analysed.")
 
-    # ── Scan sent ──────────────────────────────────────────────────────────
     if args.sent:
         print(f"📤 Sent:   {args.sent}")
         n = 0
@@ -260,50 +300,65 @@ def analyze(args):
     else:
         print("ℹ  No --sent given; 'responded' counts will be 0.")
 
-    # ── Score & filter ─────────────────────────────────────────────────────
-    all_contacts = set(threads_received) | set(threads_sent)
+    if not all_months:
+        print("⚠  No messages found in the specified range.", file=sys.stderr)
+        sys.exit(1)
+
+    # ── Build per-contact monthly records ─────────────────────────────────
+    all_contacts = set(sent_by_month) | set(received_by_month)
     results = []
 
     for contact in all_contacts:
-        s_set = threads_sent.get(contact, set())
-        r_set = threads_received.get(contact, set())
-        d_set = s_set & r_set          # threads with traffic in both directions
+        s_months = sent_by_month.get(contact, {})
+        r_months = received_by_month.get(contact, {})
+        all_c_months = set(s_months) | set(r_months)
 
-        s, r, d = len(s_set), len(r_set), len(d_set)
-        total = s + r + d
+        months_data = {}
+        lifetime_total = 0
 
-        if total < args.min_count:
+        for m in sorted(all_c_months):
+            s_set = s_months.get(m, set())
+            r_set = r_months.get(m, set())
+            d_set = s_set & r_set
+            s, r, d = len(s_set), len(r_set), len(d_set)
+            if s or r or d:
+                months_data[m] = {"sent": s, "received": r, "responded": d}
+                lifetime_total += s + r + d
+
+        if lifetime_total < args.min_count:
             continue
 
         results.append({
-            "email":     contact,
-            "name":      names.get(contact) or derive_name(contact),
-            "sent":      s,
-            "received":  r,
-            "responded": d,
+            "email":  contact,
+            "name":   names.get(contact) or derive_name(contact),
+            "months": months_data,
         })
 
-    results.sort(key=lambda x: x["sent"] + x["received"] + x["responded"], reverse=True)
-    results = results[:args.top_n]
+    # Sort by lifetime score descending
+    def lifetime(c):
+        return sum(v["sent"] + v["received"] + v["responded"] for v in c["months"].values())
 
-    # ── Write JSON ─────────────────────────────────────────────────────────
+    results.sort(key=lifetime, reverse=True)
+
+    # ── Write output ───────────────────────────────────────────────────────
+    sorted_months = sorted(all_months)
     output = {
-        "me":      my_email,
-        "period":  {"from": args.date_from, "to": args.date_to},
-        "contacts": results,
+        "me":        my_email,
+        "data_from": sorted_months[0],
+        "data_to":   sorted_months[-1],
+        "contacts":  results,
     }
 
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
-    print(f"\n✅  Wrote {len(results)} contacts → {args.out}\n")
-    print(f"   {'#':>3}  {'Score':>5}  {'Name':<30}  Breakdown (sent / received / responded)")
-    print("   " + "─" * 72)
-    for i, c in enumerate(results, 1):
-        total = c["sent"] + c["received"] + c["responded"]
-        bar = "▪" * min(24, total // 2)
-        print(f"   {i:>3}.  {total:>5}  {(c['name'] or c['email']):<30}  "
-              f"s={c['sent']} r={c['received']} d={c['responded']}  {bar}")
+    print(f"\n✅  Wrote {len(results)} contacts → {args.out}")
+    print(f"    Data spans {sorted_months[0]} → {sorted_months[-1]}\n")
+    print(f"   {'#':>3}  {'Lifetime':>8}  Name")
+    print("   " + "─" * 50)
+    for i, c in enumerate(results[:20], 1):
+        lt = lifetime(c)
+        print(f"   {i:>3}.  {lt:>8}  {c['name'] or c['email']}")
 
     return output
 

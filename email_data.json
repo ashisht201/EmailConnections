@@ -1,11 +1,105 @@
 {
   "me": "you@example.com",
-  "period": { "from": "2024-03-01", "to": "2025-03-01" },
+  "data_from": "2024-03",
+  "data_to": "2025-02",
   "contacts": [
-    { "email": "alice@corp.com",    "name": "Alice Chen",    "sent": 34, "received": 28, "responded": 41 },
-    { "email": "bob@startup.io",    "name": "Bob Mercer",    "sent": 22, "received": 19, "responded": 25 },
-    { "email": "carol@agency.co",   "name": "Carol Voss",    "sent": 18, "received": 31, "responded": 20 },
-    { "email": "kira@finance.com",  "name": "Kira Walsh",    "sent": 20, "received": 14, "responded": 18 },
-    { "email": "henry@partner.biz", "name": "Henry Kim",     "sent": 11, "received": 9,  "responded": 16 }
+    {
+      "email": "alice@corp.com",
+      "name": "Alice Chen",
+      "months": {
+        "2024-03": { "sent": 3, "received": 2, "responded": 2 },
+        "2024-04": { "sent": 4, "received": 3, "responded": 3 },
+        "2024-05": { "sent": 2, "received": 1, "responded": 1 },
+        "2024-06": { "sent": 3, "received": 3, "responded": 3 },
+        "2024-07": { "sent": 1, "received": 2, "responded": 1 },
+        "2024-08": { "sent": 4, "received": 3, "responded": 3 },
+        "2024-09": { "sent": 3, "received": 2, "responded": 2 },
+        "2024-10": { "sent": 4, "received": 3, "responded": 3 },
+        "2024-11": { "sent": 3, "received": 3, "responded": 3 },
+        "2024-12": { "sent": 4, "received": 3, "responded": 4 },
+        "2025-01": { "sent": 3, "received": 3, "responded": 3 },
+        "2025-02": { "sent": 2, "received": 2, "responded": 2 }
+      }
+    },
+    {
+      "email": "bob@startup.io",
+      "name": "Bob Mercer",
+      "months": {
+        "2024-03": { "sent": 2, "received": 1, "responded": 1 },
+        "2024-04": { "sent": 2, "received": 2, "responded": 2 },
+        "2024-05": { "sent": 1, "received": 1, "responded": 1 },
+        "2024-06": { "sent": 2, "received": 2, "responded": 2 },
+        "2024-07": { "sent": 2, "received": 1, "responded": 1 },
+        "2024-08": { "sent": 3, "received": 2, "responded": 2 },
+        "2024-09": { "sent": 2, "received": 2, "responded": 2 },
+        "2024-10": { "sent": 2, "received": 2, "responded": 2 },
+        "2024-11": { "sent": 2, "received": 2, "responded": 2 },
+        "2024-12": { "sent": 2, "received": 2, "responded": 2 },
+        "2025-01": { "sent": 2, "received": 1, "responded": 1 },
+        "2025-02": { "sent": 2, "received": 1, "responded": 1 }
+      }
+    },
+    {
+      "email": "carol@agency.co",
+      "name": "Carol Voss",
+      "months": {
+        "2024-03": { "sent": 1, "received": 3, "responded": 1 },
+        "2024-04": { "sent": 1, "received": 3, "responded": 1 },
+        "2024-05": { "sent": 2, "received": 2, "responded": 2 },
+        "2024-06": { "sent": 1, "received": 3, "responded": 1 },
+        "2024-07": { "sent": 2, "received": 2, "responded": 2 },
+        "2024-08": { "sent": 1, "received": 3, "responded": 1 },
+        "2024-09": { "sent": 2, "received": 2, "responded": 2 },
+        "2024-10": { "sent": 2, "received": 3, "responded": 2 },
+        "2024-11": { "sent": 2, "received": 3, "responded": 2 },
+        "2024-12": { "sent": 2, "received": 3, "responded": 2 },
+        "2025-01": { "sent": 2, "received": 3, "responded": 2 },
+        "2025-02": { "sent": 2, "received": 1, "responded": 1 }
+      }
+    },
+    {
+      "email": "kira@finance.com",
+      "name": "Kira Walsh",
+      "months": {
+        "2024-03": { "sent": 2, "received": 1, "responded": 1 },
+        "2024-04": { "sent": 2, "received": 1, "responded": 1 },
+        "2024-06": { "sent": 2, "received": 2, "responded": 2 },
+        "2024-08": { "sent": 2, "received": 1, "responded": 1 },
+        "2024-09": { "sent": 2, "received": 2, "responded": 2 },
+        "2024-10": { "sent": 2, "received": 2, "responded": 2 },
+        "2024-11": { "sent": 2, "received": 1, "responded": 1 },
+        "2024-12": { "sent": 2, "received": 2, "responded": 2 },
+        "2025-01": { "sent": 2, "received": 1, "responded": 1 },
+        "2025-02": { "sent": 2, "received": 1, "responded": 1 }
+      }
+    },
+    {
+      "email": "henry@partner.biz",
+      "name": "Henry Kim",
+      "months": {
+        "2024-04": { "sent": 1, "received": 1, "responded": 1 },
+        "2024-05": { "sent": 1, "received": 1, "responded": 1 },
+        "2024-07": { "sent": 1, "received": 1, "responded": 1 },
+        "2024-08": { "sent": 1, "received": 1, "responded": 1 },
+        "2024-09": { "sent": 1, "received": 1, "responded": 1 },
+        "2024-10": { "sent": 1, "received": 1, "responded": 1 },
+        "2024-11": { "sent": 1, "received": 1, "responded": 1 },
+        "2024-12": { "sent": 2, "received": 1, "responded": 1 },
+        "2025-01": { "sent": 1, "received": 1, "responded": 1 },
+        "2025-02": { "sent": 1, "received": 0, "responded": 0 }
+      }
+    },
+    {
+      "email": "eve@freelance.me",
+      "name": "Eve Santos",
+      "months": {
+        "2024-05": { "sent": 2, "received": 1, "responded": 1 },
+        "2024-06": { "sent": 2, "received": 1, "responded": 1 },
+        "2024-07": { "sent": 2, "received": 1, "responded": 1 },
+        "2024-10": { "sent": 2, "received": 1, "responded": 1 },
+        "2024-11": { "sent": 2, "received": 1, "responded": 1 },
+        "2025-01": { "sent": 3, "received": 2, "responded": 2 }
+      }
+    }
   ]
 }
