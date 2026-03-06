@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Email Gravity — Contacts</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#07090f; --surface:#0d1220; --surface2:#111827;
+  --border:#1a2035; --muted:#2a3550; --dim:#4a5568;
+  --text:#c8d0e0; --bright:#f0f4ff;
+  --blue:#3b82f6; --blue-dim:#1e3a6e;
+  --green:#10d98a; --green-dim:#0a3d2a;
+  --amber:#f59e0b; --amber-dim:#3d2a08;
+  --red:#f43f5e; --purple:#a855f7;
+  --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif;
+}
+
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px}
+#app{display:flex;flex-direction:column;height:100vh}
+
+/* ── Header ── */
+header{
+  flex-shrink:0;padding:14px 28px 12px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+}
+.h-titles .eyebrow{font-size:9px;letter-spacing:4px;color:var(--muted);text-transform:uppercase}
+.h-titles .title{font-family:var(--sans);font-size:18px;font-weight:700;color:var(--bright);margin-top:2px}
+.h-actions{display:flex;gap:8px;margin-left:auto;align-items:center;flex-wrap:wrap}
+.btn{
+  border:none;border-radius:5px;font-family:var(--mono);font-size:11px;
+  letter-spacing:1px;text-transform:uppercase;padding:7px 16px;cursor:pointer;
+  transition:opacity .15s;text-decoration:none;display:inline-flex;align-items:center;gap:6px;
+}
+.btn:hover{opacity:.8}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--muted);color:var(--dim)}
+.btn-ghost:hover{border-color:var(--text);color:var(--text)}
+.btn-danger{background:transparent;border:1px solid var(--red);color:var(--red)}
+.btn-sm{padding:4px 10px;font-size:10px}
+
+/* ── Toolbar ── */
+#toolbar{
+  flex-shrink:0;padding:8px 28px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  background:var(--surface);
+}
+.search-wrap{position:relative;flex:1;min-width:200px;max-width:340px}
+.search-wrap input{
+  width:100%;background:var(--bg);border:1px solid var(--muted);border-radius:5px;
+  color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 10px 6px 30px;
+  outline:none;transition:border-color .15s;
+}
+.search-wrap input:focus{border-color:var(--blue)}
+.search-wrap .icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:13px;pointer-events:none}
+.filter-btns{display:flex;gap:4px}
+.fbtn{
+  font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;
+  padding:5px 10px;border-radius:4px;border:1px solid var(--muted);background:transparent;
+  color:var(--dim);cursor:pointer;transition:all .15s;
+}
+.fbtn:hover{border-color:var(--text);color:var(--text)}
+.fbtn.active{background:var(--blue-dim);border-color:var(--blue);color:var(--blue)}
+.toolbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+#row-count{font-size:10px;color:var(--dim);letter-spacing:1px}
+
+/* ── Table ── */
+.table-wrap{flex:1;overflow:auto}
+table{width:100%;border-collapse:collapse}
+thead{position:sticky;top:0;z-index:10}
+thead th{
+  background:var(--surface2);padding:9px 14px;
+  font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);
+  font-weight:400;border-bottom:1px solid var(--border);white-space:nowrap;
+  cursor:pointer;user-select:none;
+}
+thead th:hover{color:var(--text)}
+thead th.sorted{color:var(--blue)}
+thead th .sort-arrow{margin-left:4px;opacity:.5}
+thead th.sorted .sort-arrow{opacity:1}
+
+tbody tr{border-bottom:1px solid #0e1525;transition:background .1s}
+tbody tr:hover{background:var(--surface)}
+td{padding:8px 14px;vertical-align:middle}
+
+/* Name + email cell */
+.contact-cell{display:flex;flex-direction:column;gap:1px}
+.contact-name{color:var(--bright);font-size:12px}
+.contact-email{color:var(--dim);font-size:10px}
+
+/* Score chip */
+.score-chip{
+  display:inline-block;padding:2px 8px;border-radius:10px;
+  font-size:10px;font-weight:600;background:var(--muted);color:var(--text);
+}
+
+/* Bar cell */
+.bar-cell{display:flex;flex-direction:column;gap:2px;min-width:80px}
+.mini-bar-row{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--dim)}
+.mini-bar-track{flex:1;height:3px;background:var(--border);border-radius:2px}
+.mini-bar-fill{height:100%;border-radius:2px}
+
+/* Category pill */
+.cat-pill{
+  display:inline-block;padding:3px 10px;border-radius:12px;
+  font-size:10px;letter-spacing:.5px;cursor:pointer;
+  border:1px solid transparent;transition:all .15s;white-space:nowrap;
+}
+.cat-none    {background:var(--muted);color:var(--dim);border-color:var(--muted)}
+.cat-internal{background:var(--green-dim);color:var(--green);border-color:#0d5c40}
+.cat-external{background:var(--amber-dim);color:var(--amber);border-color:#6b4800}
+.cat-pill:hover{filter:brightness(1.3)}
+
+/* Tag input */
+.tag-input{
+  background:transparent;border:none;border-bottom:1px solid var(--muted);
+  color:var(--text);font-family:var(--mono);font-size:11px;
+  padding:2px 4px;width:110px;outline:none;transition:border-color .15s;
+}
+.tag-input:focus{border-color:var(--blue)}
+.tag-input::placeholder{color:var(--muted)}
+
+/* ── Footer ── */
+footer{
+  flex-shrink:0;padding:8px 28px;border-top:1px solid var(--border);
+  display:flex;gap:20px;font-size:10px;color:var(--muted);letter-spacing:1px;flex-wrap:wrap;
+  align-items:center;
+}
+.save-indicator{font-size:10px;color:var(--green);opacity:0;transition:opacity .4s;letter-spacing:1px}
+.save-indicator.flash{opacity:1}
+
+/* ── Overlay ── */
+#overlay{
+  position:fixed;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;
+  font-size:13px;color:var(--dim);background:var(--bg);z-index:100;
+}
+#overlay.hidden{display:none}
+.spinner{width:32px;height:32px;border:2px solid var(--muted);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+code{background:#1a2540;padding:2px 5px;border-radius:3px;color:#66aaff;font-family:var(--mono)}
+.error-hint{font-size:10px;color:var(--muted);max-width:360px;text-align:center;line-height:1.8}
+
+/* ── Bulk assign bar ── */
+#bulk-bar{
+  display:none;padding:6px 28px;background:var(--blue-dim);border-bottom:1px solid var(--blue);
+  align-items:center;gap:12px;font-size:11px;color:var(--blue);flex-wrap:wrap;
+}
+#bulk-bar.visible{display:flex}
+#bulk-bar .bulk-label{font-weight:600;letter-spacing:1px}
+</style>
+</head>
+<body>
+<script src="contacts-store.js"></script>
+<div id="app">
+
+<div id="overlay"><div class="spinner"></div><span>Loading…</span></div>
+
+<header>
+  <div class="h-titles">
+    <div class="eyebrow">Email Gravity Map</div>
+    <div class="title">Contact Directory</div>
+  </div>
+  <div class="h-actions">
+    <button class="btn btn-ghost btn-sm" id="btn-export-csv">↓ Export CSV</button>
+    <button class="btn btn-ghost btn-sm" id="btn-clear-meta" style="border-color:#f43f5e;color:#f43f5e">✕ Clear all tags</button>
+    <a class="btn btn-primary btn-sm" href="index.html">← Back to viz</a>
+  </div>
+</header>
+
+<div id="bulk-bar">
+  <span class="bulk-label" id="bulk-count">0 selected</span>
+  <span>Set category:</span>
+  <button class="btn btn-sm" style="background:var(--green-dim);color:var(--green);border:1px solid #0d5c40" id="bulk-internal">Internal</button>
+  <button class="btn btn-sm" style="background:var(--amber-dim);color:var(--amber);border:1px solid #6b4800" id="bulk-external">External</button>
+  <button class="btn btn-sm" style="background:var(--muted);color:var(--dim)" id="bulk-none">Unset</button>
+  <span style="margin-left:8px">Set tag:</span>
+  <input id="bulk-tag-input" placeholder="tag name…" style="background:var(--surface);border:1px solid var(--blue);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:11px;padding:4px 8px;outline:none;width:130px"/>
+  <button class="btn btn-sm btn-primary" id="bulk-apply-tag">Apply tag</button>
+  <button class="btn btn-sm btn-ghost" style="margin-left:auto" id="bulk-deselect">✕ Deselect</button>
+</div>
+
+<div id="toolbar">
+  <div class="search-wrap">
+    <span class="icon">⌕</span>
+    <input id="search-input" placeholder="Search name or email…" type="text"/>
+  </div>
+  <div class="filter-btns">
+    <button class="fbtn active" data-filter="all">All</button>
+    <button class="fbtn" data-filter="internal">Internal</button>
+    <button class="fbtn" data-filter="external">External</button>
+    <button class="fbtn" data-filter="unset">Unset</button>
+  </div>
+  <div class="toolbar-right">
+    <span id="row-count">— contacts</span>
+  </div>
+</div>
+
+<div class="table-wrap">
+<table id="contacts-table">
+  <thead>
+    <tr>
+      <th style="width:28px"><input type="checkbox" id="select-all" title="Select all"/></th>
+      <th data-col="name">Contact <span class="sort-arrow">↕</span></th>
+      <th data-col="score">Score <span class="sort-arrow">↕</span></th>
+      <th data-col="breakdown">Breakdown</th>
+      <th data-col="category">Category <span class="sort-arrow">↕</span></th>
+      <th data-col="tag">Tag <span class="sort-arrow">↕</span></th>
+    </tr>
+  </thead>
+  <tbody id="table-body"></tbody>
+</table>
+</div>
+
+<footer>
+  <span id="ft-total">—</span>
+  <span id="ft-tagged">—</span>
+  <span id="ft-internal">—</span>
+  <span id="ft-external">—</span>
+  <span class="save-indicator" id="save-indicator">✓ SAVED</span>
+</footer>
+
+</div>
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// Data
+// ══════════════════════════════════════════════════════════════════════════════
+let allContacts = [];   // { email, name, totalScore, sent, received, responded }
+let metaMap     = {};   // email → { category, tag }
+let sortCol     = 'score';
+let sortAsc     = false;
+let filterCat   = 'all';
+let searchQ     = '';
+let selected    = new Set();
+
+// ── Load JSON ─────────────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const res = await fetch('email_data.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const raw = await res.json();
+
+    // Flatten monthly data into lifetime totals
+    allContacts = raw.contacts.map(c => {
+      let sent=0,received=0,responded=0;
+      for (const v of Object.values(c.months||{})) {
+        sent+=v.sent||0; received+=v.received||0; responded+=v.responded||0;
+      }
+      return { email:c.email, name:c.name||'', sent, received, responded,
+               totalScore: sent+received+responded };
+    });
+    allContacts.sort((a,b)=>b.totalScore-a.totalScore);
+
+    metaMap = ContactStore.load();
+    document.getElementById('overlay').classList.add('hidden');
+    render();
+  } catch(e) {
+    document.getElementById('overlay').innerHTML = `
+      <div style="font-size:26px">⚠</div>
+      <span style="color:#f0f4ff">email_data.json not found</span>
+      <div class="error-hint">Make sure <code>email_data.json</code> is in the same folder.<br>
+      <a href="index.html" style="color:#3b82f6">← Back to viz</a></div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Save helper
+// ══════════════════════════════════════════════════════════════════════════════
+let saveTimer;
+function saveAndFlash() {
+  ContactStore.replace(metaMap);
+  const ind = document.getElementById('save-indicator');
+  ind.classList.add('flash');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>ind.classList.remove('flash'), 1400);
+  updateFooter();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Render
+// ══════════════════════════════════════════════════════════════════════════════
+const maxScore = () => Math.max(...allContacts.map(c=>c.totalScore), 1);
+
+function filteredSorted() {
+  let rows = allContacts.filter(c => {
+    const meta = metaMap[c.email] || {};
+    if (filterCat === 'internal' && meta.category !== 'internal') return false;
+    if (filterCat === 'external' && meta.category !== 'external') return false;
+    if (filterCat === 'unset'    && meta.category) return false;
+    if (searchQ) {
+      const q = searchQ.toLowerCase();
+      if (!c.name.toLowerCase().includes(q) && !c.email.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  rows.sort((a,b) => {
+    let va, vb;
+    const ma = metaMap[a.email]||{}, mb = metaMap[b.email]||{};
+    if      (sortCol==='name')     { va=a.name||a.email; vb=b.name||b.email; }
+    else if (sortCol==='score')    { va=a.totalScore;     vb=b.totalScore; }
+    else if (sortCol==='category') { va=ma.category||'zzz'; vb=mb.category||'zzz'; }
+    else if (sortCol==='tag')      { va=ma.tag||'zzz';      vb=mb.tag||'zzz'; }
+    else                           { va=a.totalScore;     vb=b.totalScore; }
+    if (va < vb) return sortAsc ? -1 : 1;
+    if (va > vb) return sortAsc ?  1 : -1;
+    return 0;
+  });
+  return rows;
+}
+
+function render() {
+  const rows = filteredSorted();
+  const tbody = document.getElementById('table-body');
+  const ms = maxScore();
+
+  tbody.innerHTML = '';
+  rows.forEach(c => {
+    const meta = metaMap[c.email] || { category:'', tag:'' };
+    const tr = document.createElement('tr');
+    tr.dataset.email = c.email;
+
+    // Checkbox
+    const tdCb = document.createElement('td');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = selected.has(c.email);
+    cb.addEventListener('change', e => {
+      if (e.target.checked) selected.add(c.email); else selected.delete(c.email);
+      updateBulkBar(); updateSelectAll();
+    });
+    tdCb.appendChild(cb); tr.appendChild(tdCb);
+
+    // Contact
+    const tdName = document.createElement('td');
+    tdName.innerHTML = `<div class="contact-cell">
+      <span class="contact-name">${esc(c.name||c.email.split('@')[0])}</span>
+      <span class="contact-email">${esc(c.email)}</span>
+    </div>`;
+    tr.appendChild(tdName);
+
+    // Score
+    const tdScore = document.createElement('td');
+    const pct = Math.round(c.totalScore/ms*100);
+    const chipColor = pct>70?'#3b82f6':pct>40?'#a855f7':'#4a5568';
+    tdScore.innerHTML = `<span class="score-chip" style="background:${chipColor}22;color:${chipColor};border:1px solid ${chipColor}44">${c.totalScore}</span>`;
+    tr.appendChild(tdScore);
+
+    // Breakdown bars
+    const tdBars = document.createElement('td');
+    const maxV = Math.max(c.sent, c.received, c.responded, 1);
+    tdBars.innerHTML = `<div class="bar-cell">
+      <div class="mini-bar-row"><span style="width:58px;color:#3b82f6">sent ${c.sent}</span><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${Math.round(c.sent/maxV*100)}%;background:#3b82f6"></div></div></div>
+      <div class="mini-bar-row"><span style="width:58px;color:#f43f5e">recv ${c.received}</span><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${Math.round(c.received/maxV*100)}%;background:#f43f5e"></div></div></div>
+      <div class="mini-bar-row"><span style="width:58px;color:#f59e0b">resp ${c.responded}</span><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${Math.round(c.responded/maxV*100)}%;background:#f59e0b"></div></div></div>
+    </div>`;
+    tr.appendChild(tdBars);
+
+    // Category
+    const tdCat = document.createElement('td');
+    const catLabel = meta.category==='internal'?'Internal':meta.category==='external'?'External':'Unset';
+    const catClass = meta.category==='internal'?'cat-internal':meta.category==='external'?'cat-external':'cat-none';
+    const pill = document.createElement('span');
+    pill.className = `cat-pill ${catClass}`;
+    pill.textContent = catLabel;
+    pill.title = 'Click to cycle: Unset → Internal → External';
+    pill.addEventListener('click', () => {
+      const cur = (metaMap[c.email]||{}).category||'';
+      const next = cur===''?'internal':cur==='internal'?'external':'';
+      if (!metaMap[c.email]) metaMap[c.email]={category:'',tag:''};
+      metaMap[c.email].category = next;
+      saveAndFlash(); render();
+    });
+    tdCat.appendChild(pill); tr.appendChild(tdCat);
+
+    // Tag
+    const tdTag = document.createElement('td');
+    const tagIn = document.createElement('input');
+    tagIn.className = 'tag-input';
+    tagIn.value = meta.tag || '';
+    tagIn.placeholder = 'add tag…';
+    tagIn.addEventListener('change', e => {
+      if (!metaMap[c.email]) metaMap[c.email]={category:'',tag:''};
+      metaMap[c.email].tag = e.target.value.trim();
+      saveAndFlash();
+    });
+    tagIn.addEventListener('keydown', e => { if(e.key==='Enter') tagIn.blur(); });
+    tdTag.appendChild(tagIn); tr.appendChild(tdTag);
+
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('row-count').textContent = `${rows.length} contact${rows.length!==1?'s':''}`;
+  updateFooter();
+  updateSelectAll();
+}
+
+function updateFooter() {
+  const all = allContacts;
+  const tagged    = all.filter(c=>(metaMap[c.email]||{}).tag).length;
+  const internals = all.filter(c=>(metaMap[c.email]||{}).category==='internal').length;
+  const externals = all.filter(c=>(metaMap[c.email]||{}).category==='external').length;
+  document.getElementById('ft-total').textContent    = `TOTAL: ${all.length}`;
+  document.getElementById('ft-tagged').textContent   = `TAGGED: ${tagged}`;
+  document.getElementById('ft-internal').textContent = `INTERNAL: ${internals}`;
+  document.getElementById('ft-external').textContent = `EXTERNAL: ${externals}`;
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  if (selected.size > 0) {
+    bar.classList.add('visible');
+    document.getElementById('bulk-count').textContent = `${selected.size} selected`;
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+function updateSelectAll() {
+  const rows = filteredSorted();
+  const visEmails = rows.map(r=>r.email);
+  const allChecked = visEmails.length>0 && visEmails.every(e=>selected.has(e));
+  document.getElementById('select-all').checked = allChecked;
+  document.getElementById('select-all').indeterminate = !allChecked && visEmails.some(e=>selected.has(e));
+}
+
+// ── Select all ────────────────────────────────────────────────────────────────
+document.getElementById('select-all').addEventListener('change', e => {
+  const rows = filteredSorted();
+  if (e.target.checked) rows.forEach(r=>selected.add(r.email));
+  else rows.forEach(r=>selected.delete(r.email));
+  updateBulkBar(); render();
+});
+
+// ── Bulk actions ──────────────────────────────────────────────────────────────
+function bulkSetCat(cat) {
+  selected.forEach(email => {
+    if (!metaMap[email]) metaMap[email]={category:'',tag:''};
+    metaMap[email].category = cat;
+  });
+  saveAndFlash(); render();
+}
+document.getElementById('bulk-internal').addEventListener('click',()=>bulkSetCat('internal'));
+document.getElementById('bulk-external').addEventListener('click',()=>bulkSetCat('external'));
+document.getElementById('bulk-none').addEventListener('click',()=>bulkSetCat(''));
+document.getElementById('bulk-apply-tag').addEventListener('click',()=>{
+  const tag = document.getElementById('bulk-tag-input').value.trim();
+  selected.forEach(email => {
+    if (!metaMap[email]) metaMap[email]={category:'',tag:''};
+    metaMap[email].tag = tag;
+  });
+  saveAndFlash(); render();
+});
+document.getElementById('bulk-deselect').addEventListener('click',()=>{
+  selected.clear(); updateBulkBar(); render();
+});
+
+// ── Sort ──────────────────────────────────────────────────────────────────────
+document.querySelectorAll('thead th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (col==='breakdown') return;
+    if (sortCol===col) sortAsc=!sortAsc; else { sortCol=col; sortAsc=col==='name'||col==='tag'||col==='category'; }
+    document.querySelectorAll('thead th').forEach(t=>t.classList.remove('sorted'));
+    th.classList.add('sorted');
+    th.querySelector('.sort-arrow').textContent = sortAsc?'↑':'↓';
+    render();
+  });
+});
+
+// ── Filter ────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.fbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    filterCat = btn.dataset.filter;
+    render();
+  });
+});
+
+// ── Search ────────────────────────────────────────────────────────────────────
+document.getElementById('search-input').addEventListener('input', e => {
+  searchQ = e.target.value.trim();
+  render();
+});
+
+// ── Export CSV ────────────────────────────────────────────────────────────────
+document.getElementById('btn-export-csv').addEventListener('click', () => {
+  const rows = ['Name,Email,Score,Sent,Received,Responded,Category,Tag'];
+  allContacts.forEach(c => {
+    const m = metaMap[c.email]||{};
+    rows.push([c.name,c.email,c.totalScore,c.sent,c.received,c.responded,
+      m.category||'',m.tag||''].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
+  });
+  const blob = new Blob([rows.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='email_gravity_contacts.csv'; a.click();
+});
+
+// ── Clear metadata ────────────────────────────────────────────────────────────
+document.getElementById('btn-clear-meta').addEventListener('click', () => {
+  if (!confirm('Clear ALL category and tag data? This cannot be undone.')) return;
+  metaMap = {};
+  ContactStore.replace({});
+  render();
+});
+
+// ── Utility ───────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+loadData();
+</script>
+</body>
+</html>
