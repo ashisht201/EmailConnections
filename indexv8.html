@@ -160,7 +160,7 @@ code{background:#1a2540;padding:2px 5px;border-radius:3px;color:#66aaff;font-fam
     <div class="ctrl-sep"></div>
     <div class="ctrl-group">
       <span class="ctrl-label">Repel</span>
-      <input type="range" id="sl-repel" min="1" max="50" value="8" step="1" style="width:80px">
+      <input type="range" id="sl-repel" min="1" max="20" value="8" step="1" style="width:80px">
       <span class="ctrl-val" id="v-repel">8</span>
     </div>
     <div class="ctrl-sep"></div>
@@ -173,7 +173,6 @@ code{background:#1a2540;padding:2px 5px;border-radius:3px;color:#66aaff;font-fam
     <button class="toggle-btn on" id="tog-clusters">Clusters On</button>
     <button class="toggle-btn on" id="tog-zones">Zones On</button>
     <button class="toggle-btn on" id="tog-lines">Lines On</button>
-    <button class="toggle-btn on" id="tog-names">Names On</button>
     <div class="ctrl-sep"></div>
     <button class="toggle-btn" id="btn-reset-physics" style="border-color:#ff3d6e;color:#ff3d6e">Reset</button>
   </div>
@@ -262,7 +261,7 @@ const COL_DEF = { sent: '#00cfff', recv: '#ff3d6e', resp: '#ffe033' };
 const ch = { ...COL_DEF };
 
 // Toggles
-const tog = { clusters: true, zones: true, lines: true, names: true };
+const tog = { clusters: true, zones: true, lines: true };
 
 // Auth
 const SESSION_KEY = 'egm_auth';
@@ -439,9 +438,6 @@ wireToggle('tog-zones',    'zones',    'Zones On',    'Zones Off',    () => {
 wireToggle('tog-lines', 'lines', 'Lines On', 'Lines Off', () => {
   document.querySelectorAll('.line-el').forEach(e => e.style.display = tog.lines ? '' : 'none');
 });
-wireToggle('tog-names', 'names', 'Names On', 'Names Off', () => {
-  document.querySelectorAll('.node-label').forEach(e => e.style.display = tog.names ? '' : 'none');
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -473,7 +469,7 @@ function nodeRadius(score, maxScore) { return 12 + (score / maxScore) * 32; }
 
 class ForceLayout {
   constructor(nodes, w, h) {
-    this.w = w; this.h = h; this.iter = 0; this.MAX = 1200;
+    this.w = w; this.h = h; this.iter = 0; this.MAX = 800;
     this.pos = {}; this.vel = {};
     // Seed positions: internal left-half, external right-half, unset center
     nodes.forEach(n => {
@@ -720,10 +716,9 @@ function buildSVG(contacts) {
     const score = se('text', { x: 0, y: 1, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
       style: `font-size:${Math.max(8, r * .44)}px;fill:${rgba(col)};font-family:var(--mono);font-weight:600;user-select:none` });
     score.textContent = c.totals.score;
-    const label = se('text', { x: 0, y: r + 13, 'text-anchor': 'middle', class: 'node-label',
+    const label = se('text', { x: 0, y: r + 13, 'text-anchor': 'middle',
       style: 'font-size:9px;fill:var(--dim);font-family:var(--mono);letter-spacing:.3px;user-select:none' });
     label.textContent = c.name || c.email.split('@')[0];
-    if (!tog.names) label.style.display = 'none';
     const tagEl = se('text', { x: 0, y: r + 23, 'text-anchor': 'middle',
       style: 'font-size:8px;fill:var(--muted);font-family:var(--mono);user-select:none;font-style:italic' });
     if (meta.tag) tagEl.textContent = '#' + meta.tag;
@@ -741,7 +736,7 @@ function buildSVG(contacts) {
     g.addEventListener('mouseleave', () => {
       ring.setAttribute('opacity', '0');
       body.setAttribute('filter', 'url(#glow)'); body.setAttribute('stroke', rgba(col, .8)); body.setAttribute('stroke-width', '1.3');
-      label.setAttribute('style', 'font-size:9px;fill:var(--dim);font-family:var(--mono);letter-spacing:.3px;user-select:none' + (tog.names ? '' : ';display:none'));
+      label.setAttribute('style', 'font-size:9px;fill:var(--dim);font-family:var(--mono);letter-spacing:.3px;user-select:none');
       lineEls[c.email].setAttribute('stroke', rgba(col, .25)); lineEls[c.email].setAttribute('stroke-width', baseStrokeW); lineEls[c.email].setAttribute('stroke-dasharray', '3 7');
       hideDetail();
     });
