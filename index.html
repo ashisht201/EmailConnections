@@ -264,12 +264,46 @@ const ch = { ...COL_DEF };
 // Toggles
 const tog = { clusters: true, zones: true, lines: true, names: true };
 
-// Auth
-const SESSION_KEY = 'egm_auth';
-// Default password: "gravity"
-// Change: run in console → crypto.subtle.digest('SHA-256',new TextEncoder().encode('pass'))
-//   .then(b=>console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')))
-const PASS_HASH = 'd4e3fc7b0477747da28f05c27af9f1ab8e70cd60f729a2813f410fd39eb466ac';
+// ─────────────────────────────────────────────────────────────────────────────
+// CRYPTO  — PBKDF2 key derivation + AES-256-GCM decrypt
+// The password IS the key. Wrong password → decrypt throws → gate stays closed.
+// No stored hash needed — authentication comes from AES-GCM's auth tag.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function deriveKey(password, salt) {
+  const km = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 310000, hash: 'SHA-256' },
+    km,
+    { name: 'AES-GCM', length: 256 },
+    false, ['decrypt']
+  );
+}
+
+// Decrypt an .enc ArrayBuffer produced by encrypt.html
+// Format: [4 magic][1 version][32 salt][12 iv][ciphertext+tag]
+async function decryptEnc(password, buf) {
+  const b = new Uint8Array(buf);
+  if (b[0]!==0x45||b[1]!==0x47||b[2]!==0x4D||b[3]!==0x01)
+    throw new Error('Not a valid .enc file');
+  const salt = b.slice(5, 37);
+  const iv   = b.slice(37, 49);
+  const ct   = b.slice(49);
+  const key  = await deriveKey(password, salt);
+  const pt   = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Password is stored in sessionStorage so the user isn't re-prompted on refresh.
+// It is cleared on lock.  Never stored in a cookie or localStorage.
+const SESSION_KEY  = 'egm_auth';
+const SESSION_PASS = 'egm_pass'; // encrypted password kept only for session reuse
 
 // ContactStore safety shim — guards against contacts-store.js failing to load
 const CS = (typeof ContactStore !== 'undefined') ? ContactStore : {
@@ -281,34 +315,43 @@ const CS = (typeof ContactStore !== 'undefined') ? ContactStore : {
 // GATE
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function sha256(str) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, '0')).join('');
-}
-
 async function tryUnlock() {
   const inp = $('gate-input'), err = $('gate-err');
-  const hash = await sha256(inp.value);
-  if (hash === PASS_HASH) {
-    sessionStorage.setItem(SESSION_KEY, '1');
+  const pw = inp.value;
+  if (!pw) return;
+
+  const btn = $('gate-btn');
+  btn.textContent = 'Decrypting…'; btn.disabled = true;
+  err.textContent = '';
+
+  try {
+    // Fetch and decrypt right here — proves the password is correct before
+    // showing the app.  Wrong password → AES-GCM throws → catch block.
+    const res = await fetch('email_data.enc');
+    if (!res.ok) throw new Error(`Could not fetch email_data.enc (HTTP ${res.status})`);
+    rawData = await decryptEnc(pw, await res.arrayBuffer());
+
+    // Password is correct — store it for this session only (tab close clears it)
+    sessionStorage.setItem(SESSION_KEY,  '1');
+    sessionStorage.setItem(SESSION_PASS, pw);
+    inp.value = '';
     $('gate').classList.add('hidden');
     $('app').style.display = 'flex';
-    err.textContent = '';
-    // Defer loadData by one rAF so browser paints the layout first
-    // (ensures wrap_.clientWidth > 0 when buildSVG measures it)
-    requestAnimationFrame(() => loadData());
-  } else {
-    err.textContent = 'Incorrect password';
+    requestAnimationFrame(() => bootVisualiser());
+  } catch(e) {
+    const isWrongPw = e.name === 'OperationError'; // Web Crypto throws this on bad auth tag
+    err.textContent = isWrongPw ? 'Incorrect password' : `Error: ${e.message}`;
     inp.value = ''; inp.focus();
     inp.style.borderColor = '#ff3d6e';
     setTimeout(() => { inp.style.borderColor = ''; }, 800);
   }
+  btn.textContent = 'Unlock'; btn.disabled = false;
 }
 
 $('gate-btn').addEventListener('click', tryUnlock);
 $('gate-input').addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
 
-// Resume existing session
+// Resume existing session (data must be re-decrypted — rawData is in-memory only)
 if (sessionStorage.getItem(SESSION_KEY) === '1') {
   $('gate').classList.add('hidden');
   $('app').style.display = 'flex';
@@ -316,6 +359,7 @@ if (sessionStorage.getItem(SESSION_KEY) === '1') {
 
 $('btn-lock').addEventListener('click', () => {
   sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_PASS);
   cancelAnimationFrame(rafId);
   $('app').style.display = 'none';
   $('gate').classList.remove('hidden');
@@ -832,39 +876,58 @@ function applyWindow() {
 // LOAD DATA
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BOOT / DATA LOADING
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Called after rawData is already populated (either fresh unlock or session resume)
+function bootVisualiser() {
+  if (!rawData.data_from || !rawData.data_to) {
+    overlay_.innerHTML = `<div style="font-size:26px">⚠</div><span style="color:var(--bright)">Invalid data format</span><div class="error-hint">email_data.enc decrypted but is missing <code>data_from</code> or <code>data_to</code> fields.</div>`;
+    overlay_.classList.remove('hidden');
+    return;
+  }
+  inputFrom.min = rawData.data_from; inputFrom.max = rawData.data_to;
+  inputTo.min   = rawData.data_from; inputTo.max   = rawData.data_to;
+  inputFrom.value = rawData.data_from; inputTo.value = rawData.data_to;
+  overlay_.classList.add('hidden');
+  applyWindow();
+}
+
+// Called on page load when a session token exists but rawData is gone (in-memory only)
+// Re-fetches and re-decrypts using the password stored in sessionStorage
 async function loadData() {
-  // Show spinner
   overlay_.innerHTML = '<div class="spinner"></div><span>Loading…</span>';
   overlay_.classList.remove('hidden');
 
+  const pw = sessionStorage.getItem(SESSION_PASS);
+  if (!pw) {
+    // Session token exists but password is gone — force re-login
+    sessionStorage.removeItem(SESSION_KEY);
+    $('app').style.display = 'none';
+    $('gate').classList.remove('hidden');
+    overlay_.classList.add('hidden');
+    return;
+  }
+
   try {
-    const res = await fetch('email_data.json');
+    const res = await fetch('email_data.enc');
     if (!res.ok) throw new Error(`HTTP ${res.status} — ${res.statusText}`);
-    rawData = await res.json();
-  } catch (e) {
+    rawData = await decryptEnc(pw, await res.arrayBuffer());
+  } catch(e) {
     overlay_.innerHTML = `
       <div style="font-size:26px">⚠</div>
-      <span style="color:var(--bright)">Could not load email_data.json</span>
+      <span style="color:var(--bright)">Could not load data</span>
       <div class="error-hint">
         ${e.message}<br><br>
-        Make sure <code>email_data.json</code> is in the same folder as <code>index.html</code>
-        and has been pushed to your GitHub repo.
+        Make sure <code>email_data.enc</code> is in the same folder as <code>index.html</code>
+        and has been pushed to your GitHub repo. Generate it using <code>encrypt.html</code>.
       </div>
       <button onclick="loadData()" style="background:var(--c-sent);border:none;border-radius:4px;color:#000;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1px;padding:6px 14px;cursor:pointer;margin-top:8px">Retry</button>`;
     return;
   }
 
-  if (!rawData.data_from || !rawData.data_to) {
-    overlay_.innerHTML = `<div style="font-size:26px">⚠</div><span style="color:var(--bright)">Invalid data format</span><div class="error-hint">email_data.json is missing <code>data_from</code> or <code>data_to</code> fields.</div>`;
-    return;
-  }
-
-  inputFrom.min = rawData.data_from; inputFrom.max = rawData.data_to;
-  inputTo.min   = rawData.data_from; inputTo.max   = rawData.data_to;
-  inputFrom.value = rawData.data_from; inputTo.value = rawData.data_to;
-
-  overlay_.classList.add('hidden');
-  applyWindow();
+  bootVisualiser();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -896,10 +959,8 @@ let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTime
 // BOOT
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Only boot if already authenticated (session exists from earlier unlock)
+// Session resume: rawData lives in-memory only — re-fetch and re-decrypt on refresh
 if (sessionStorage.getItem(SESSION_KEY) === '1') {
-  // rAF defers loadData until after browser has painted #app as display:flex,
-  // ensuring wrap_.clientWidth > 0 when buildSVG runs
   requestAnimationFrame(() => loadData());
 }
 </script>

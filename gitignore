@@ -1,0 +1,14 @@
+# ── Plaintext email data — NEVER commit this ──────────────────────────────────
+email_data.json
+
+# The encrypted version (email_data.enc) IS safe to commit — do not ignore it
+
+# ── Local encryption tool — no need in the repo ───────────────────────────────
+encrypt.html
+
+# ── OS / editor noise ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp
+*~
